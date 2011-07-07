@@ -1,0 +1,73 @@
+#!/bin/bash
+FORMULA_DIR=$(dirname $0)
+ARG0=${0##*/}
+
+if [[ -e $FORMULA_DIR/nova-compute-common ]] ; then
+  . $FORMULA_DIR/nova-compute-common
+else
+  echo "ERROR: Could not load nova-compute-common from $FORMULA_DIR"
+fi
+
+function install_hook {
+  apt-get -y install python-software-properties || exit 1
+  add-apt-repository ppa:nova-core/trunk || exit 1
+  apt-get update || exit 1
+  apt-get -y install $SERVICES || exit 1
+  nova_ctl all stop
+}
+
+function amqp_joined {
+  ensemble-log "amqp_joined: requesting credentials for $RABBIT_USER"
+  echo "amqp_joined: requesting credentials for $RABBIT_USER"
+  relation-set username=$RABBIT_USER
+}
+
+function amqp_changed {
+  RABBIT_HOST=`relation-get ip`
+  RABBIT_PASSWORD=`relation-get password` 
+  if [[ -z $RABBIT_HOST ]] || [[ -z $RABBIT_PASSWORD ]] ; then
+    echo "amqp_changed: RABBIT_HOST not set. Peer not ready? Exit 0 and retry"
+    exit 0
+  fi
+  echo "amqp_changed: Setting rabbit config in nova.conf: $RABBIT_HOST $RABBIT_USER $RABBIT_PASSWORD"
+  set_or_update rabbit_host $RABBIT_HOST
+  set_or_update rabbit_user $RABBIT_USER
+  set_or_update rabbit_password $RABBIT_PASSWORD
+  nova_ctl all restart
+}
+
+function db_joined {
+  # tell mysql provider which database we want. it will create it and give us
+  # credentials
+  ensemble-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@$IP"
+  relation-set database=$NOVA_DB
+  relation-set username=$DB_USER
+  relation-set hostname=`uname -n`
+  relation-set ip=$IP
+}
+
+function db_changed {
+  DB_HOST=`relation-get db_host`
+  DB_PASSWORD=`relation-get password`
+  if [[ -z $DB_HOST ]] || [[ -z $DB_PASSWORD ]] ; then
+    echo "db_changed: DB_HOST || DB_PASSWORD not yet set. Exit 0 and retry"
+    exit 0
+  fi
+  echo "db_changed: Configuring nova.conf for access to $NOVA_DB"
+  set_or_update sql_connection "mysql://$DB_USER:$DB_PASSWORD@$DB_HOST/$NOVA_DB"
+  nova_ctl all restart
+}
+
+function cc_joined {
+  relation-set nova-api-server=$IP
+}
+case $ARG0 in
+  "install") install_hook ;;
+  "start"|"stop") exit 0 ;;
+  "amqp-relation-joined") amqp_joined ;;
+  "amqp-relation-changed") amqp_changed ;;
+  "shared-db-relation-joined") db_joined ;;
+  "shared-db-relation-changed") db_changed ;;
+esac
+
+

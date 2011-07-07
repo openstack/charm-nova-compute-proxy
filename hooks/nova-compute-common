@@ -1,0 +1,43 @@
+#!/bin/bash
+SERVICES="nova-compute"
+NOVA_CONF="/etc/nova/nova.conf"
+RABBIT_USER="nova-compute"
+DB_USER="nova"
+NOVA_DB="nova"
+DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
+IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
+
+function set_or_update {
+  # set or update a key=value config option in nova.conf
+  KEY=$1
+  VALUE=$2
+  [[ -z $KEY ]] && exit 1
+  [[ -z $VALUE ]] && exit 1
+  cat $NOVA_CONF | grep "\-\-$KEY=$VALUE" >/dev/null \
+   && ensemble-log "nova-cloud-controller: $KEY=$VALUE already set" exit 0
+  if cat $NOVA_CONF | grep "\-\-$KEY=" >/dev/null ; then
+    sed -i "s|\(--$KEY=\).*|\1$VALUE|" $NOVA_CONF
+  else
+    echo "--$KEY=$VALUE" >>$NOVA_CONF
+  fi
+}
+
+function nova_ctl {
+  if [[ $1 == "all" ]] ; then
+    CTL=$SERVICES
+  else
+    CTL=$1
+  fi
+  ACTION=$2
+  if [[ -z $CTL ]] || [[ -z $ACTION ]] ; then
+    ensemble-log "ERROR nova_ctl: Not enough arguments"
+    exit 1
+  fi
+  for i in $CTL ; do
+    service $i $ACTION
+    if [[ $? != 0 ]] ; then
+      ensemble-log "ERROR nova_ctl: Service $i failed to $ACTION"
+    fi
+  done
+}
+
