@@ -58,9 +58,29 @@ function db_changed {
   nova_ctl all restart
 }
 
+function nova-network_changed {
+  MANAGER=`relation-get network_manager`
+  if [[ -z $MANAGER ]] ; then
+    echo "nova-network_changed: MANAGER not yet set. Exit 0 and retry"
+    exit 0
+  fi
+  configure_network_manager $MANAGER
+}
+
+function image-service_changed {
+  GLANCE_API_SERVER=`relation-get glance-api-server`
+  if [[ -z $GLANCE_API_SERVER ]] ; then
+    echo "image-service_changed: GLANCE_API_SERVER not yet set. Exit 0 and retry"
+    exit 0
+  fi
+  set_or_update glance_api_servers $GLANCE_API_SERVER
+  nova_ctl all restart
+}
+
 function cc_joined {
   relation-set nova-api-server=$IP
 }
+
 case $ARG0 in
   "install") install_hook ;;
   "start"|"stop") exit 0 ;;
@@ -68,6 +88,10 @@ case $ARG0 in
   "amqp-relation-changed") amqp_changed ;;
   "shared-db-relation-joined") db_joined ;;
   "shared-db-relation-changed") db_changed ;;
+  "nova-network-relation-joined") exit 0 ;;
+  "nova-network-relation-changed") nova-network_changed ;;
+  "image-service-relation-joined") exit 0 ;;
+  "image-service-relation-changed") image-service_changed ;;
 esac
 
 

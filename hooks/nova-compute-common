@@ -4,6 +4,11 @@ NOVA_CONF="/etc/nova/nova.conf"
 RABBIT_USER="nova-compute"
 DB_USER="nova"
 NOVA_DB="nova"
+
+NETWORK_MANAGER="FlatManager"
+NETWORK_BRIDGE="br100"
+BRIDGE_IP="11.0.0.2"
+
 DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
 IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
 
@@ -39,5 +44,45 @@ function nova_ctl {
       ensemble-log "ERROR nova_ctl: Service $i failed to $ACTION"
     fi
   done
+}
+
+function setup_bridge {
+  # XXX This is required by nova-network and will likely move somewhere else
+  # once we can split these services up into seperate formulas.
+  br=$1
+  ip=$2
+  netmask=$3
+  [[ -z $br ]] && br="br100"
+  [[ -z $ip ]] && ip="11.0.0.1"
+  [[ -z $netmask ]] && netmask="255.255.255.0"
+
+  apt-get -y install bridge-utils augeas-lenses augeas-tools
+  echo "Configuring bridge $br ($ip $netmask)"
+  context="/files/etc/network/interfaces"
+  augtool <<EOF
+  set $context/auto[child::1 = "$br"]/1 $br
+  set $context/iface[. = '$br'] $br
+  set $context/iface[. = '$br']/family inet
+  set $context/iface[. = '$br']/method static
+  set $context/iface[. = '$br']/address $ip
+  set $context/iface[. = '$br']/netmask $netmask
+  set $context/iface[. = '$br']/bridge_ports none 
+  save
+EOF
+  ifdown -a ; ifup -a
+}
+
+function configure_network_manager {
+  # needed by the nova-network bits
+  # to be expanded later to cover flatDhcp and VLAN
+  echo "$0: configuring $1 network manager"
+  case $1 in
+    "FlatManager")
+      setup_bridge $NETWORK_BRIDGE $BRIDGE_IP $BRIDGE_NETMASK
+      set_or_update network_manager nova.network.manager.FlatManager
+      set_or_update flat_network_bridge $NETWORK_BRIDGE
+      ;;
+    *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
+  esac
 }
 
