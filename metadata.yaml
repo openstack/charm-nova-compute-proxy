@@ -1,6 +1,6 @@
 ensemble: formula
 name: nova-compute
-revision: 10 
+revision: 10
 summary: "OpenStack compute"
 description: |
  OpenStack Compute, codenamed Nova, is a cloud computing fabric controller. In
@@ -11,7 +11,7 @@ provides:
     interface: nova-compute
 requires:
   shared-db:
-    interface: mysql
+    interface: mysql-shared
   amqp:
     interface: rabbitmq
   image-service:
