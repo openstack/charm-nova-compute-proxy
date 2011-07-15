@@ -9,8 +9,7 @@ NETWORK_MANAGER="FlatManager"
 NETWORK_BRIDGE="br100"
 BRIDGE_IP="11.0.0.2"
 
-DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
-IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
+HOSTNAME=`hostname -f`
 
 function set_or_update {
   # set or update a key=value config option in nova.conf

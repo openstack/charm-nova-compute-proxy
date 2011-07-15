@@ -48,8 +48,7 @@ function db_joined {
   ensemble-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@$IP"
   relation-set database=$NOVA_DB
   relation-set username=$DB_USER
-  relation-set hostname=`uname -n`
-  relation-set ip=$IP
+  relation-set hostname=$HOSTNAME
 }
 
 function db_changed {
@@ -81,10 +80,6 @@ function image-service_changed {
   fi
   set_or_update glance_api_servers $GLANCE_API_SERVER
   nova_ctl all restart
-}
-
-function cc_joined {
-  relation-set nova-api-server=$IP
 }
 
 case $ARG0 in
