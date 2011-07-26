@@ -10,7 +10,7 @@ fi
 
 function install_hook {
   apt-get -y install python-software-properties || exit 1
-  add-apt-repository ppa:nova-core/trunk || exit 1
+  add_ppa
   apt-get update || exit 1
   apt-get -y install $SERVICES || exit 1
 
@@ -26,19 +26,21 @@ function amqp_joined {
   ensemble-log "amqp_joined: requesting credentials for $RABBIT_USER"
   echo "amqp_joined: requesting credentials for $RABBIT_USER"
   relation-set username=$RABBIT_USER
+  relation-set vhost=$RABBIT_VHOST
 }
 
 function amqp_changed {
-  RABBIT_HOST=`relation-get ip`
+  RABBIT_HOST=`relation-get hostname`
   RABBIT_PASSWORD=`relation-get password` 
   if [[ -z $RABBIT_HOST ]] || [[ -z $RABBIT_PASSWORD ]] ; then
-    echo "amqp_changed: RABBIT_HOST not set. Peer not ready? Exit 0 and retry"
+    echo "amqp_changed: RABBIT_HOST||RABBIT_PASSWORD not set. Peer not ready? Exit 0 and retry"
     exit 0
   fi
   echo "amqp_changed: Setting rabbit config in nova.conf: $RABBIT_HOST $RABBIT_USER $RABBIT_PASSWORD"
   set_or_update rabbit_host $RABBIT_HOST
   set_or_update rabbit_user $RABBIT_USER
   set_or_update rabbit_password $RABBIT_PASSWORD
+  set_or_update rabbit_virtual_host $RABBIT_VHOST
   nova_ctl all restart
 }
 

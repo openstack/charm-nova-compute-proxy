@@ -1,7 +1,10 @@
 #!/bin/bash
 SERVICES="nova-compute"
 NOVA_CONF="/etc/nova/nova.conf"
+
 RABBIT_USER="nova-compute"
+RABBIT_VHOST="nova"
+
 DB_USER="nova"
 NOVA_DB="nova"
 
@@ -85,3 +88,16 @@ function configure_network_manager {
   esac
 }
 
+function add_ppa {
+  # temporarily find out what nova version we
+  # should be using from a source file.  this
+  # should go away when ensemble can handle config
+  # better.
+  if [[ -e $FORMULA_DIR/nova-version ]] ; then
+    . $FORMULA_DIR/nova-version
+    . /etc/lsb-release
+    [[ -z $PPA ]] && return 0
+    PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
+    add-apt-repository "$PPA_URL" || exit 1
+  fi
+}
