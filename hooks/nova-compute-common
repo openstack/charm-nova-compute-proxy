@@ -32,11 +32,11 @@ function set_or_update {
 function nova_ctl_status {
   SERVICE=$1
   # workaround upstarts lack of scriptable return codes
-  STATUS=$(service nova-compute status | cut -d/ -f1 | awk '{ print $2 }')
+  STATUS=$(service $SERVICE status | cut -d/ -f1 | awk '{ print $2 }')
   case $STATUS in
     "start") return 0 ;;
     "stop") return 1 ;;
-    *) echo "ERROR: Unexpected status of service $I: $STATUS" && exit 1 ;;
+    *) echo "ERROR: Unexpected status of service $SERVICE: $STATUS" && exit 1 ;;
   esac
 }
 
