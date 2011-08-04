@@ -60,6 +60,9 @@ function nova_ctl {
       "restart")
         nova_ctl_status $i && service $i restart || service $i start ;;
     esac
+    if [[ $? != 0 ]] ; then
+      ensemble-log "nova_ctl: ERROR - Service $i failed to $ACTION"
+    fi
   done
 }
 
