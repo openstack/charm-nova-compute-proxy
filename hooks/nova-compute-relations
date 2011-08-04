@@ -13,12 +13,6 @@ function install_hook {
   add_ppa
   apt-get update || exit 1
   apt-get -y install $SERVICES || exit 1
-
-  # XXX sudo on the ensemble sample AMI doesnt function
-  # as it should (doesn't include suoders.d/*). do this
-  # manually until we can use any AMI
-  echo "nova ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
-
   nova_ctl all stop
 }
 
