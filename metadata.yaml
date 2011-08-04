@@ -1,6 +1,6 @@
 ensemble: formula
 name: nova-compute
-revision: 16
+revision: 17
 summary: "OpenStack compute"
 description: |
  OpenStack Compute, codenamed Nova, is a cloud computing fabric controller. In
