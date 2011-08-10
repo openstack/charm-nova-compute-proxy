@@ -1,0 +1,10 @@
+nova-compute:
+  nova-release: trunk
+  nova-config: /etc/nova/nova.conf
+  db-user: nova
+  nova-db: nova
+  rabbit-user: nova
+  rabbit-vhost: nova
+  bridge-interface: br100
+  bridge-ip: 11.0.0.2
+  bridge-netmask: 255.255.255.0
