@@ -1,17 +1,16 @@
 #!/bin/bash
 SERVICES="nova-compute"
-NOVA_CONF="/etc/nova/nova.conf"
-
-RABBIT_USER="nova-compute"
-RABBIT_VHOST="nova"
-
-DB_USER="nova"
-NOVA_DB="nova"
-
-NETWORK_MANAGER="FlatManager"
-NETWORK_BRIDGE="br100"
-BRIDGE_IP="11.0.0.2"
-
+NOVA_RELEASE=$(config-get nova-release)
+NOVA_CONF=$(config-get nova-config)
+RABBIT_USER=$(config-get rabbit-user)
+RABBIT_VHOST=$(config-get rabbit-vhost)
+DB_USER=$(config-get db-user)
+NOVA_DB=$(config-get nova-db)
+NETWORK_MANAGER=$(config-get network-manager)
+NETWORK_BRIDGE=$(config-get bridge-interface)
+BRIDGE_IP=$(config-get bridge-ip)
+BRIDGE_NETMASK=$(config-get bridge-netmask)
+PPA=$(config-get nova-release)
 HOSTNAME=`hostname -f`
 
 function set_or_update {
@@ -107,15 +106,11 @@ function configure_network_manager {
 }
 
 function add_ppa {
-  # temporarily find out what nova version we
-  # should be using from a source file.  this
-  # should go away when ensemble can handle config
-  # better.
-  if [[ -e $FORMULA_DIR/nova-version ]] ; then
-    . $FORMULA_DIR/nova-version
-    . /etc/lsb-release
-    [[ -z $PPA ]] && return 0
-    PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
-    add-apt-repository "$PPA_URL" || exit 1
-  fi
+  # don't setup PPA, install from archive
+  [[ $PPA == "distro" ]] && return 0
+  ensemble-log "nova-cloud-controller: Configuring PPA access for $PPA"
+  . /etc/lsb-release
+  PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
+  echo "Executing: add-apt-repository \"$PPA_URL\"" || exit 1
+  add-apt-repository "$PPA_URL" || exit 1
 }
