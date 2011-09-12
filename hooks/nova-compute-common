@@ -95,6 +95,9 @@ function configure_network_manager {
   # needed by the nova-network bits
   # to be expanded later to cover flatDhcp and VLAN
   echo "$0: configuring $1 network manager"
+
+  NETWORK_BRIDGE=$(config-get bridge-interface)
+
   case $1 in
     "FlatManager")
       setup_bridge $NETWORK_BRIDGE $BRIDGE_IP $BRIDGE_NETMASK
@@ -102,11 +105,11 @@ function configure_network_manager {
       set_or_update flat_network_bridge $NETWORK_BRIDGE
       ;;
     "FlatDHCPManager")
-      FLAT_INTERFACE=$(config-get flat_interface)
-      EC2_HOST=$(relation-get-get ec2_host)
+      FLAT_INTERFACE=$(config-get flat-interface)
+      EC2_HOST=$(relation-get ec2_host)
       set_or_update network_manager nova.network.manager.FlatDCHPManager
       # the interface on which bridge is built
-      set_or_update bridge_interface $FLAT_INTERFACE
+      set_or_update flat_interface $FLAT_INTERFACE
       # address of API server to forward requests
       set_or_update ec2_host $EC2_HOST
       ;;

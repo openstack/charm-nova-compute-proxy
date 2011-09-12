@@ -23,6 +23,8 @@ options:
     default: nova
     type: string
     description: Database name
+
+  # needed if using flatmanager
   bridge-interface:
     default: br100
     type: string
@@ -35,3 +37,9 @@ options:
     default: 255.255.255.0
     type: string
     description: Netmask to be assigned to bridge interface
+
+  # needed if using flatdhcpmanager
+  flat-interface:
+    default: eth1
+    type: string
+    description: Network interface on which to build bridge
