@@ -1,37 +1,37 @@
 options:
   nova-release:
     default: distro
-    type: str
+    type: string
     description: Nova PPA from which to install. (distro, trunk, milestone, milestone-proposed)
   nova-config:
     default: /etc/nova/nova.conf
-    type: str
+    type: string
     description: Full path to nova.conf
   rabbit-user:
     default: nova
-    type: str
+    type: string
     description: Username used to access rabbitmq queue
   rabbit-vhost:
     default: nova
-    type: str
+    type: string
     decsription: Rabbitmq vhost
   db-user:
     default: nova
-    type: str
+    type: string
     description: Username for database access
   nova-db:
     default: nova
-    type: str
+    type: string
     description: Database name
   bridge-interface:
     default: br100
-    type: str
+    type: string
     description: Bridge interface to be configured
   bridge-ip:
     default: 11.0.0.1
-    type: str
+    type: string
     description: IP to be assigned to bridge interface
   bridge-netmask:
     default: 255.255.255.0
-    type: str
+    type: string
     description: Netmask to be assigned to bridge interface
