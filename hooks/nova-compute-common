@@ -107,11 +107,13 @@ function configure_network_manager {
     "FlatDHCPManager")
       FLAT_INTERFACE=$(config-get flat-interface)
       EC2_HOST=$(relation-get ec2_host)
-      set_or_update network_manager nova.network.manager.FlatDCHPManager
+      [[ -z $EC2_HOST ]] && ensemble-log "nova-compute: Missing EC2_HOST" \
+        && exit 0
+      set_or_update network_manager nova.network.manager.FlatDHCPManager
       # the interface on which bridge is built
       set_or_update flat_interface $FLAT_INTERFACE
       # address of API server to forward requests
-      set_or_update ec2_host $EC2_HOST
+      set_or_update ec2_dmz_host $EC2_HOST
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac

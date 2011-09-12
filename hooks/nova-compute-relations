@@ -72,6 +72,7 @@ function nova-network_changed {
     exit 0
   fi
   configure_network_manager $MANAGER
+  nova_ctl all restart
 }
 
 function image-service_changed {
