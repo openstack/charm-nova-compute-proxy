@@ -14,7 +14,7 @@ function install_hook {
   apt-get update || exit 1
   apt-get -y install $SERVICES || exit 1
 
-  # XXX sudo on the ensemble sample AMI doesnt function
+  # XXX sudo on the juju sample AMI doesnt function
   # as it should (doesn't include suoders.d/*). do this
   # manually until we can use any AMI
   echo "nova ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
@@ -23,7 +23,7 @@ function install_hook {
 }
 
 function amqp_joined {
-  ensemble-log "amqp_joined: requesting credentials for $RABBIT_USER"
+  juju-log "amqp_joined: requesting credentials for $RABBIT_USER"
   echo "amqp_joined: requesting credentials for $RABBIT_USER"
   relation-set username=$RABBIT_USER
   relation-set vhost=$RABBIT_VHOST
@@ -47,7 +47,7 @@ function amqp_changed {
 function db_joined {
   # tell mysql provider which database we want. it will create it and give us
   # credentials
-  ensemble-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@$IP"
+  juju-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@$IP"
   relation-set database=$NOVA_DB
   relation-set username=$DB_USER
   relation-set hostname=$HOSTNAME
