@@ -20,7 +20,7 @@ function set_or_update {
   [[ -z $KEY ]] && exit 1
   [[ -z $VALUE ]] && exit 1
   cat $NOVA_CONF | grep "\-\-$KEY=$VALUE" >/dev/null \
-   && ensemble-log "nova-cloud-controller: $KEY=$VALUE already set" exit 0
+   && ensemble-log "nova-compute: $KEY=$VALUE already set" exit 0
   if cat $NOVA_CONF | grep "\-\-$KEY=" >/dev/null ; then
     sed -i "s|\(--$KEY=\).*|\1$VALUE|" $NOVA_CONF
   else
@@ -123,7 +123,7 @@ function configure_network_manager {
 function add_ppa {
   # don't setup PPA, install from archive
   [[ $PPA == "distro" ]] && return 0
-  ensemble-log "nova-cloud-controller: Configuring PPA access for $PPA"
+  ensemble-log "nova-compute: Configuring PPA access for $PPA"
   . /etc/lsb-release
   PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
   echo "Executing: add-apt-repository \"$PPA_URL\"" || exit 1
