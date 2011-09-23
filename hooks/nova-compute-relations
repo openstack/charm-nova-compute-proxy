@@ -63,6 +63,15 @@ function db_changed {
   echo "db_changed: Configuring nova.conf for access to $NOVA_DB"
   set_or_update sql_connection "mysql://$DB_USER:$DB_PASSWORD@$DB_HOST/$NOVA_DB"
   nova_ctl all restart
+  # this works around lp #855971 until (ideally) we can add some functionality
+  # to nova/nova-manage to do this for us. reserve the IP of this host in the dhcp
+  # pool and assign it to this host
+  DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
+  IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
+  apt-get -y install mysql-client
+  mysql -u $DB_USER -h $DB_HOST -p$DB_PASSWORD -e \
+    "UPDATE fixed_ips SET reserved='1' AND host='`hostname`' \
+       WHERE address='$IP'" $DATABASE
 }
 
 function nova-network_changed {
