@@ -19,6 +19,14 @@ function install_hook {
   # manually until we can use any AMI
   echo "nova ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
+  # update /etc/default/libvirt-bin to listen on tcp
+  # for live migration purposes
+  DEFAULT_OPTS=$(grep "^libvirtd_opts" /etc/default/libvirt-bin | cut -d= -f2)
+  if ! echo $DEFAULT_OPTS | grep '\-l' >/dev/null ; then
+    juju-log "Updating /etc/default/libvirt-bin"
+    sed -i "s/\(^libvirtd_opts=\"\)/\1-l /g" /etc/default/libvirt-bin
+    service libvirt-bin restart
+  fi
   nova_ctl all stop
 }
 
@@ -47,7 +55,7 @@ function amqp_changed {
 function db_joined {
   # tell mysql provider which database we want. it will create it and give us
   # credentials
-  juju-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@$IP"
+  juju-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@$HOSTNAME"
   relation-set database=$NOVA_DB
   relation-set username=$DB_USER
   relation-set hostname=$HOSTNAME
@@ -70,8 +78,8 @@ function db_changed {
   IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
   apt-get -y install mysql-client
   mysql -u $DB_USER -h $DB_HOST -p$DB_PASSWORD -e \
-    "UPDATE fixed_ips SET reserved='1' AND host='`hostname`' \
-       WHERE address='$IP'" $DATABASE
+    "UPDATE fixed_ips SET reserved='1', host='$(hostname)' \
+       WHERE address='$IP'" $NOVA_DB
 }
 
 function nova-network_changed {
