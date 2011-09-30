@@ -19,14 +19,15 @@ function install_hook {
   # manually until we can use any AMI
   echo "nova ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
+  # DISABLED till SSL cert stuff is done (otherwise libvirt wont start)
   # update /etc/default/libvirt-bin to listen on tcp
   # for live migration purposes
-  DEFAULT_OPTS=$(grep "^libvirtd_opts" /etc/default/libvirt-bin | cut -d= -f2)
-  if ! echo $DEFAULT_OPTS | grep '\-l' >/dev/null ; then
-    juju-log "Updating /etc/default/libvirt-bin"
-    sed -i "s/\(^libvirtd_opts=\"\)/\1-l /g" /etc/default/libvirt-bin
-    service libvirt-bin restart
-  fi
+  #DEFAULT_OPTS=$(grep "^libvirtd_opts" /etc/default/libvirt-bin | cut -d= -f2)
+  #if ! echo $DEFAULT_OPTS | grep '\-l' >/dev/null ; then
+  #  juju-log "Updating /etc/default/libvirt-bin"
+  #  sed -i "s/\(^libvirtd_opts=\"\)/\1-l /g" /etc/default/libvirt-bin
+  #  service libvirt-bin restart
+  #fi
   nova_ctl all stop
 }
 
@@ -74,12 +75,12 @@ function db_changed {
   # this works around lp #855971 until (ideally) we can add some functionality
   # to nova/nova-manage to do this for us. reserve the IP of this host in the dhcp
   # pool and assign it to this host
-  DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
-  IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
-  apt-get -y install mysql-client
-  mysql -u $DB_USER -h $DB_HOST -p$DB_PASSWORD -e \
-    "UPDATE fixed_ips SET reserved='1', host='$(hostname)' \
-       WHERE address='$IP'" $NOVA_DB
+  #DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
+  #IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
+  #apt-get -y install mysql-client
+  #mysql -u $DB_USER -h $DB_HOST -p$DB_PASSWORD -e \
+  #  "UPDATE fixed_ips SET reserved='1', host='$(hostname)' \
+  #     WHERE address='$IP'" $NOVA_DB
 }
 
 function nova-network_changed {
