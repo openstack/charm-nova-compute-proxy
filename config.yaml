@@ -23,6 +23,10 @@ options:
     default: nova
     type: string
     description: Database name
+  virt-type:
+    default: kvm
+    type: string
+    description: "Virtualization flavor. Supported: kvm, xen, uml, lxc"
 
   # needed if using flatmanager
   bridge-interface:

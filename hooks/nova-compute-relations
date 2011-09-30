@@ -9,10 +9,18 @@ else
 fi
 
 function install_hook {
+  [[ -z $VIRT_TYPE ]] && VIRT_TYPE="kvm"
+  case $VIRT_TYPE in
+    "kvm") COMPUTE_PKG="nova-compute-kvm";;
+    "xen") COMPUTE_PKG="nova-compute-xen";;
+    "uml") COMPUTE_PKG="nova-compute-uml";;
+    "lxc") COMPUTE_PKG="nova-compute-lxc";;
+    *) juju-log "ERROR: Unsupported VIRT_TYPE=$VIRT_TYPE";;
+  esac
   apt-get -y install python-software-properties || exit 1
   add_ppa
   apt-get update || exit 1
-  apt-get -y install $SERVICES || exit 1
+  apt-get -y install $COMPUTE_PKG nova-network || exit 1
 
   # XXX sudo on the juju sample AMI doesnt function
   # as it should (doesn't include suoders.d/*). do this
