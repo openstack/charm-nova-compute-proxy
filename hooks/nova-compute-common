@@ -12,7 +12,6 @@ BRIDGE_IP=$(config-get bridge-ip)
 BRIDGE_NETMASK=$(config-get bridge-netmask)
 PPA=$(config-get nova-release)
 VIRT_TYPE=$(config-get virt-type)
-HOSTNAME=`hostname -f`
 
 function set_or_update {
   # set or update a key=value config option in nova.conf

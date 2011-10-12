@@ -47,7 +47,7 @@ function amqp_joined {
 }
 
 function amqp_changed {
-  RABBIT_HOST=`relation-get hostname`
+  RABBIT_HOST=`relation-get private-address`
   RABBIT_PASSWORD=`relation-get password` 
   if [[ -z $RABBIT_HOST ]] || [[ -z $RABBIT_PASSWORD ]] ; then
     echo "amqp_changed: RABBIT_HOST||RABBIT_PASSWORD not set. Peer not ready? Exit 0 and retry"
@@ -64,10 +64,10 @@ function amqp_changed {
 function db_joined {
   # tell mysql provider which database we want. it will create it and give us
   # credentials
-  juju-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@$HOSTNAME"
+  juju-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@`unit-get private-address`"
   relation-set database=$NOVA_DB
   relation-set username=$DB_USER
-  relation-set hostname=$HOSTNAME
+  relation-set hostname=`unit-get private-address`
 }
 
 function db_changed {
