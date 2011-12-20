@@ -26,7 +26,7 @@ options:
   virt-type:
     default: kvm
     type: string
-    description: "Virtualization flavor. Supported: kvm, xen, uml, lxc"
+    description: "Virtualization flavor. Supported: kvm, xen, uml, lxc. qemu"
 
   # needed if using flatmanager
   bridge-interface:
