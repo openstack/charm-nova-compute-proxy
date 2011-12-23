@@ -1,5 +1,5 @@
 #!/bin/bash
-SERVICES="nova-compute nova-network"
+SERVICES="nova-compute nova-network nova-api"
 NOVA_RELEASE=$(config-get nova-release)
 NOVA_CONF=$(config-get nova-config)
 RABBIT_USER=$(config-get rabbit-user)

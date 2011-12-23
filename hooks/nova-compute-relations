@@ -20,7 +20,7 @@ function install_hook {
   apt-get -y install python-software-properties || exit 1
   add_ppa
   apt-get update || exit 1
-  apt-get -y install $COMPUTE_PKG nova-network || exit 1
+  apt-get -y install $COMPUTE_PKG nova-api nova-network || exit 1
 
   # there is no nova-compute-qemu pkg. Install kvm and reconfigure
   # manually for qemu.
