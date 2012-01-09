@@ -121,11 +121,23 @@ function configure_network_manager {
 }
 
 function add_ppa {
-  # don't setup PPA, install from archive
+  # Install from archive instead of PPA.
   [[ $PPA == "distro" ]] && return 0
-  juju-log "nova-compute: Configuring PPA access for $PPA"
   . /etc/lsb-release
-  PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
-  echo "Executing: add-apt-repository \"$PPA_URL\"" || exit 1
-  add-apt-repository "$PPA_URL" || exit 1
+  [[ -z $PPA ]] && return 0
+  # if referenced by name, setup ppa to upstream PPAs
+  if [[ "$PPA" == "trunk" ]] ||
+     [[ "$PPA" == "milestone" ]] ||
+     [[ "$PPA" == "milestone-proposed" ]] ; then
+      juju-log "nova: Configuring installation from upstream PPA ($PPA)"
+      PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
+      add-apt-repository "$PPA_URL" || exit 1
+      return
+  fi
+  if [[ "${PPA:0:4}" == "ppa:" ]] ; then
+    juju-log "nova: Configuring installation from custom PPA ($PPA)"
+    add-apt-repository -y "$PPA" || exit 1
+    return
+  fi
+  juju-log "nova: No PPA specified. Falling back to installation from Ubuntu archive."
 }
