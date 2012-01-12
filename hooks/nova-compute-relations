@@ -77,7 +77,7 @@ function db_joined {
 }
 
 function db_changed {
-  DB_HOST=`relation-get db_host`
+  DB_HOST=`relation-get private-address`
   DB_PASSWORD=`relation-get password`
   if [[ -z $DB_HOST ]] || [[ -z $DB_PASSWORD ]] ; then
     echo "db_changed: DB_HOST || DB_PASSWORD not yet set. Exit 0 and retry"
