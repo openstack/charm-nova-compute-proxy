@@ -113,8 +113,7 @@ function configure_network_manager {
       # the interface on which bridge is built
       set_or_update flat_interface $FLAT_INTERFACE
       # address of API server to forward requests
-      EC2_HOST_IP=$(dig +short $EC2_HOST)
-      set_or_update ec2_dmz_host $EC2_HOST_IP
+      set_or_update ec2_dmz_host $EC2_HOST
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
