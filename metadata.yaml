@@ -15,7 +15,5 @@ requires:
     interface: rabbitmq
   image-service:
     interface: glance
-  cloud-controller:
-    interface: nova
   nova-network:
     interface: nova

@@ -1,5 +1,5 @@
 #!/bin/bash
-SERVICES="nova-compute nova-network"
+SERVICES="nova-compute nova-network nova-api"
 NOVA_RELEASE=$(config-get nova-release)
 NOVA_CONF=$(config-get nova-config)
 RABBIT_USER=$(config-get rabbit-user)
@@ -113,19 +113,48 @@ function configure_network_manager {
       # the interface on which bridge is built
       set_or_update flat_interface $FLAT_INTERFACE
       # address of API server to forward requests
-      EC2_HOST_IP=$(dig +short $EC2_HOST)
-      set_or_update ec2_dmz_host $EC2_HOST_IP
+      set_or_update ec2_dmz_host $EC2_HOST
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
 }
 
 function add_ppa {
-  # don't setup PPA, install from archive
+  # Install from archive instead of PPA.
   [[ $PPA == "distro" ]] && return 0
-  juju-log "nova-compute: Configuring PPA access for $PPA"
   . /etc/lsb-release
-  PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
-  echo "Executing: add-apt-repository \"$PPA_URL\"" || exit 1
-  add-apt-repository "$PPA_URL" || exit 1
+  [[ -z $PPA ]] && return 0
+  # if referenced by name, setup ppa to upstream PPAs
+  if [[ "$PPA" == "trunk" ]] ||
+     [[ "$PPA" == "milestone" ]] ||
+     [[ "$PPA" == "milestone-proposed" ]] ; then
+      juju-log "nova: Configuring installation from upstream PPA ($PPA)"
+      PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
+      add-apt-repository "$PPA_URL" || exit 1
+      return
+  fi
+  if [[ "${PPA:0:4}" == "ppa:" ]] ; then
+    juju-log "nova: Configuring installation from custom PPA ($PPA)"
+    add-apt-repository -y "$PPA" || exit 1
+    return
+  fi
+  if [[ "${PPA:0:3}" == "deb" ]] ; then
+    juju-log "nova: Configuring installation from custom PPA URL ($PPA)"
+    if echo "$PPA" | grep -q "|" ; then
+      # gpg key id tagged to end of url folloed by a |
+      url=$(echo $PPA | cut -d'|' -f1)
+      key=$(echo $PPA | cut -d'|' -f2)
+      if [[ -n "$key" ]] ; then
+        juju-log "Importing repository key: $key"
+        apt-key adv --keyserver keyserver.ubuntu.com --recv-keys "$key" || \
+          juju-log "WARN: Could not import key from keyserver: $key"
+      else
+        juju-log "No repository key specified"
+        url="$PPA"
+      fi
+      add-apt-repository -y "$url"
+    fi
+    return
+  fi
+  juju-log "nova: No PPA specified. Falling back to installation from Ubuntu archive."
 }
