@@ -124,8 +124,8 @@ case $ARG0 in
   "amqp-relation-changed") amqp_changed ;;
   "shared-db-relation-joined") db_joined ;;
   "shared-db-relation-changed") db_changed ;;
-  "nova-network-relation-joined") exit 0 ;;
-  "nova-network-relation-changed") nova-network_changed ;;
+  "network-manager-relation-joined") exit 0 ;;
+  "network-manager-relation-changed") nova-network_changed ;;
   "image-service-relation-joined") exit 0 ;;
   "image-service-relation-changed") image-service_changed ;;
 esac
