@@ -61,7 +61,7 @@ function amqp_changed {
   fi
   echo "amqp_changed: Setting rabbit config in nova.conf: $RABBIT_HOST $RABBIT_USER $RABBIT_PASSWORD"
   set_or_update rabbit_host $RABBIT_HOST
-  set_or_update rabbit_user $RABBIT_USER
+  set_or_update rabbit_userid $RABBIT_USER
   set_or_update rabbit_password $RABBIT_PASSWORD
   set_or_update rabbit_virtual_host $RABBIT_VHOST
   nova_ctl all restart
