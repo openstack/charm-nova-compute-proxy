@@ -117,6 +117,18 @@ function image-service_changed {
   nova_ctl all restart
 }
 
+function keystone_joined {
+  # service=None lets keystone know we don't need anything entered
+  # into the service catalog.  This hook exists to workaround lack
+  # of features explained here:
+  #   https://lists.ubuntu.com/archives/juju/2012-March/001342.html
+  # Once landed, this type of reconfiguration should happen in a hook
+  # triggered by nova-cloud-controller's keystone relation.
+  relation-set service="None" region="None" public_url="None" \
+               admin_url="None" internal_url="None"
+  set_or_update "auth_strategy" "keystone"
+}
+
 case $ARG0 in
   "install") install_hook ;;
   "start"|"stop") exit 0 ;;
@@ -128,6 +140,8 @@ case $ARG0 in
   "network-manager-relation-changed") nova-network_changed ;;
   "image-service-relation-joined") exit 0 ;;
   "image-service-relation-changed") image-service_changed ;;
+  "identity-service-relation-joined") keystone_joined ;;
+  "identity-service-relation-changed") exit 0 ;;
 esac
 
 

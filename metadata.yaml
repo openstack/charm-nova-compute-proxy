@@ -13,6 +13,8 @@ requires:
     interface: mysql-shared
   amqp:
     interface: rabbitmq
+  identity-service:
+    interface: keystone
   image-service:
     interface: glance
   network-manager:
