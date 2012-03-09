@@ -124,6 +124,7 @@ function keystone_joined {
   #   https://lists.ubuntu.com/archives/juju/2012-March/001342.html
   # Once landed, this type of reconfiguration should happen in a hook
   # triggered by nova-cloud-controller's keystone relation.
+  apt-get -y install python-keystone 
   relation-set service="None" region="None" public_url="None" \
                admin_url="None" internal_url="None"
   set_or_update "auth_strategy" "keystone"
