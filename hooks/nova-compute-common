@@ -28,6 +28,19 @@ function set_or_update {
   fi
 }
 
+function set_config_flags() {
+  # Set user-defined nova.conf flags from deployment config
+  juju-log "Processing config-flags."
+  flags=$(config-get config-flags)
+  if [[ "$flags" != "None" && -n "$flags" ]] ; then
+    for f in $(echo $flags | sed -e 's/,/ /g') ; do
+      k=$(echo $f | cut -d= -f1)
+      v=$(echo $f | cut -d= -f2)
+      set_or_update "$k" "$v"
+    done
+  fi
+}
+
 function nova_ctl_status {
   SERVICE=$1
   # workaround upstarts lack of scriptable return codes

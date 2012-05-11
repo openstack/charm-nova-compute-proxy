@@ -27,7 +27,6 @@ options:
     default: kvm
     type: string
     description: "Virtualization flavor. Supported: kvm, xen, uml, lxc. qemu"
-
   # needed if using flatmanager
   bridge-interface:
     default: br100
@@ -41,9 +40,13 @@ options:
     default: 255.255.255.0
     type: string
     description: Netmask to be assigned to bridge interface
-
   # needed if using flatdhcpmanager
   flat-interface:
     default: eth1
     type: string
     description: Network interface on which to build bridge
+  config-flags:
+    default: None
+    type: string
+    description: Comma separated list of key=value config flags to be set in nova.conf.
+
