@@ -14,17 +14,37 @@ PPA=$(config-get nova-release)
 VIRT_TYPE=$(config-get virt-type)
 
 function set_or_update {
-  # set or update a key=value config option in nova.conf
-  KEY=$1
-  VALUE=$2
-  [[ -z $KEY ]] && exit 1
-  [[ -z $VALUE ]] && exit 1
-  cat $NOVA_CONF | grep "\-\-$KEY=$VALUE" >/dev/null \
-   && juju-log "nova-compute: $KEY=$VALUE already set" exit 0
-  if cat $NOVA_CONF | grep "\-\-$KEY=" >/dev/null ; then
-    sed -i "s|\(--$KEY=\).*|\1$VALUE|" $NOVA_CONF
+  # Set a config option in nova.conf or api-paste.ini, depending
+  # Defaults to updating nova.conf
+  local KEY=$1
+  local VALUE=$2
+  local CONF_FILE=$3
+  local pattern=""
+  [[ -z $KEY ]] && juju-log "set_or_update: value $VALUE missing KEY" && exit 1
+  [[ -z $VALUE ]] && juju-log "set_or_update: key $KEY missing VALUE" && exit 1
+  [[ -z "$CONF_FILE" ]] && CONF_FILE=$NOVA_CONF
+
+  case "$CONF_FILE" in
+    "$NOVA_CONF") match="^$KEY="
+                  pattern="$KEY="
+                  out=$pattern
+                  ;;
+    "$API_CONF") match="^$KEY = "
+                 pattern="$match"
+                 out="$KEY = "
+                 ;;
+    *) juju-log "ERROR: set_or_update: Invalid CONF_FILE ($CONF_FILE)"
+  esac
+
+  cat $CONF_FILE | grep "$match$VALUE" >/dev/null &&
+    juju-log "nova-cloud-controller: $KEY=$VALUE already in set in $CONF_FILE" \
+      && return 0
+  if cat $CONF_FILE | grep "$match" >/dev/null ; then
+    juju-log "nova-cloud-controller: Updating $CONF_FILE, $KEY=$VALUE"
+    sed -i "s|\($pattern\).*|\1$VALUE|" $CONF_FILE
   else
-    echo "--$KEY=$VALUE" >>$NOVA_CONF
+    juju-log "nova-cloud-controller: Setting new option $KEY=$VALUE in $CONF_FILE"
+    echo "$out$VALUE" >>$CONF_FILE
   fi
 }
 
