@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 CHARM="nova-compute"
 PACKAGES="nova-compute nova-api nova-network"
@@ -26,7 +26,7 @@ determine_compute_package() {
     "lxc") compute_pkg="nova-compute-lxc";;
     *) error_out" ERROR: Unsupported virt_type=$virt_type";;
   esac
-  echo "$virt_type"
+  echo "$compute_pkg"
 }
 
 function setup_bridge {

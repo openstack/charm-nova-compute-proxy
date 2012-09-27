@@ -18,7 +18,21 @@ function install_hook {
   nova_ctl all stop
 }
 
-function config_changed {
+function config_changed() {
+
+  # Determine whether or not we should do an upgrade, based on whether or not
+  # the version offered in nova-release is greater than what is installed.
+
+  local install_src=$(config-get nova-release)
+  local cur=$(get_os_codename_package "nova-common")
+  local available=$(get_os_codename_install_source "$install_src")
+
+  if dpkg --compare-versions $(get_os_version_codename "$cur") lt \
+                             $(get_os_version_codename "$available") ; then
+    juju-log "$CHARM: Upgrading OpenStack release: $cur -> $available."
+    do_openstack_upgrade "$install_src" $PACKAGES
+  fi
+
   set_config_flags
   nova_ctl all restart
 }
