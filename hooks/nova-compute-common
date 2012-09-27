@@ -1,17 +1,26 @@
 #!/bin/bash
-SERVICES="nova-compute nova-network nova-api"
-NOVA_RELEASE=$(config-get nova-release)
+
+PACKAGES="nova-compute nova-api nova-network"
+SERVICES="$PACKAGES"
+
 NOVA_CONF=$(config-get nova-config)
-RABBIT_USER=$(config-get rabbit-user)
-RABBIT_VHOST=$(config-get rabbit-vhost)
-DB_USER=$(config-get db-user)
-NOVA_DB=$(config-get nova-db)
-NETWORK_MANAGER=$(config-get network-manager)
-NETWORK_BRIDGE=$(config-get bridge-interface)
-BRIDGE_IP=$(config-get bridge-ip)
-BRIDGE_NETMASK=$(config-get bridge-netmask)
-PPA=$(config-get nova-release)
-VIRT_TYPE=$(config-get virt-type)
+API_CONF="/etc/nova/api-paste.ini"
+
+determine_compute_package() {
+  # determines the appropriate nova-compute package to install
+  # for the configured virt-type.
+  local virt_type="$1"
+  local compute_pkg=""
+  case $virt_type in
+    "kvm") compute_pkg="nova-compute-kvm";;
+    "qemu") compute_pkg="nova-compute-qemu";;
+    "xen") compute_pkg="nova-compute-xen";;
+    "uml") compute_pkg="nova-compute-uml";;
+    "lxc") compute_pkg="nova-compute-lxc";;
+    *) error_out" ERROR: Unsupported virt_type=$virt_type";;
+  esac
+  echo "$virt_type"
+}
 
 function set_or_update {
   # Set a config option in nova.conf or api-paste.ini, depending
@@ -36,14 +45,14 @@ function set_or_update {
     *) juju-log "ERROR: set_or_update: Invalid CONF_FILE ($CONF_FILE)"
   esac
 
-  cat $CONF_FILE | grep "$match$VALUE" >/dev/null &&
-    juju-log "nova-cloud-controller: $KEY=$VALUE already in set in $CONF_FILE" \
-      && return 0
-  if cat $CONF_FILE | grep "$match" >/dev/null ; then
-    juju-log "nova-cloud-controller: Updating $CONF_FILE, $KEY=$VALUE"
+  grep -q "$match$VALUE" $CONF_FILE &&
+    juju-log "cinder: $KEY=$VALUE already in set in $CONF_FILE" && return 0
+
+  if grep -q "$match" $CONF_FILE ; then
+    juju-log "cinder: Updating $CONF_FILE, $KEY=$VALUE"
     sed -i "s|\($pattern\).*|\1$VALUE|" $CONF_FILE
   else
-    juju-log "nova-cloud-controller: Setting new option $KEY=$VALUE in $CONF_FILE"
+    juju-log "cinder: Setting new option $KEY=$VALUE in $CONF_FILE"
     echo "$out$VALUE" >>$CONF_FILE
   fi
 }
@@ -129,24 +138,26 @@ function configure_network_manager {
   # to be expanded later to cover flatDhcp and VLAN
   echo "$0: configuring $1 network manager"
 
-  NETWORK_BRIDGE=$(config-get bridge-interface)
+  local network_bridge=$(config-get bridge-interface)
 
   case $1 in
     "FlatManager")
-      setup_bridge $NETWORK_BRIDGE $BRIDGE_IP $BRIDGE_NETMASK
+      local bridge_ip=$(config-get bridge-ip)
+      local bridge_netmask=$(config-get bridge-netmask)
+      setup_bridge $network_bridge $bridge_ip $bridge_netmask
       set_or_update network_manager nova.network.manager.FlatManager
-      set_or_update flat_network_bridge $NETWORK_BRIDGE
+      set_or_update flat_network_bridge $network_bridge
       ;;
     "FlatDHCPManager")
-      FLAT_INTERFACE=$(config-get flat-interface)
-      EC2_HOST=$(relation-get ec2_host)
-      [[ -z $EC2_HOST ]] && juju-log "nova-compute: Missing EC2_HOST" \
+      local flat_interface=$(config-get flat-interface)
+      local ec2_host=$(relation-get ec2_host)
+      [[ -z $ec2_host ]] && juju-log "nova-compute: Missing ec2_host" \
         && exit 0
       set_or_update network_manager nova.network.manager.FlatDHCPManager
       # the interface on which bridge is built
-      set_or_update flat_interface $FLAT_INTERFACE
+      set_or_update flat_interface $flat_interface
       # address of API server to forward requests
-      set_or_update ec2_dmz_host $EC2_HOST
+      set_or_update ec2_dmz_host $ec2_host
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac

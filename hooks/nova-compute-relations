@@ -9,23 +9,12 @@ else
 fi
 
 function install_hook {
-  [[ -z $VIRT_TYPE ]] && VIRT_TYPE="kvm"
-  case $VIRT_TYPE in
-    "kvm") COMPUTE_PKG="nova-compute-kvm";;
-    "qemu") COMPUTE_PKG="nova-compute-qemu";;
-    "xen") COMPUTE_PKG="nova-compute-xen";;
-    "uml") COMPUTE_PKG="nova-compute-uml";;
-    "lxc") COMPUTE_PKG="nova-compute-lxc";;
-    *) juju-log "ERROR: Unsupported VIRT_TYPE=$VIRT_TYPE";;
-  esac
+  local virt_type=$(config-get virt-type)
+  local compute_pkg=$(determine_compute_package "$virt_type")
   apt-get -y install python-software-properties || exit 1
   add_ppa
   apt-get update || exit 1
-  apt-get -y install $COMPUTE_PKG nova-api nova-network || exit 1
-
-  # Configure any flags specified in deployment config
-  set_config_flags
-
+  apt-get -y install $compute_pkg $PACKAGES || exit 1
   nova_ctl all stop
 }
 
@@ -35,55 +24,67 @@ function config_changed {
 }
 
 function amqp_joined {
-  juju-log "amqp_joined: requesting credentials for $RABBIT_USER"
-  echo "amqp_joined: requesting credentials for $RABBIT_USER"
-  relation-set username=$RABBIT_USER
-  relation-set vhost=$RABBIT_VHOST
+  # we request a username on the rabbit queue
+  # and store it in nova.conf. our response is its IP + PASSWD
+  # but we configure that in _changed
+  local rabbit_user=$(config-get rabbit-user)
+  local rabbit_vhost=$(config-get rabbit-vhost)
+  juju-log "$CHARM - amqp_joined: requesting credentials for $rabbit_user"
+  relation-set username=$rabbit_user
+  relation-set vhost=$rabbit_vhost
 }
 
 function amqp_changed {
-  RABBIT_HOST=`relation-get private-address`
-  RABBIT_PASSWORD=`relation-get password` 
-  if [[ -z $RABBIT_HOST ]] || [[ -z $RABBIT_PASSWORD ]] ; then
-    echo "amqp_changed: RABBIT_HOST||RABBIT_PASSWORD not set. Peer not ready? Exit 0 and retry"
-    exit 0
+  # server creates our credentials and tells us where
+  # to connect.  for now, using default vhost '/'
+  local rabbit_host=$(relation-get private-address)
+  local rabbit_password=$(relation-get password)
+
+  if [[ -z $rabbit_host ]] || \
+     [[ -z $rabbit_password ]] ; then
+      juju-log "$CHARM - amqp_changed: rabbit_host||rabbit_password not set."
+      exit 0
   fi
-  echo "amqp_changed: Setting rabbit config in nova.conf: $RABBIT_HOST $RABBIT_USER $RABBIT_PASSWORD"
-  set_or_update rabbit_host $RABBIT_HOST
-  set_or_update rabbit_userid $RABBIT_USER
-  set_or_update rabbit_password $RABBIT_PASSWORD
-  set_or_update rabbit_virtual_host $RABBIT_VHOST
+
+  local rabbit_user=$(config-get rabbit-user)
+  local rabbit_vhost=$(config-get rabbit-vhost)
+  juju-log "$CHARM - amqp_changed: Setting rabbit config in nova.conf: " \
+           "$rabbit_user@$rabbit_host/$rabbit_vhost"
+  set_or_update rabbit_host $rabbit_host
+  set_or_update rabbit_userid $rabbit_user
+  set_or_update rabbit_password $rabbit_password
+  set_or_update rabbit_virtual_host $rabbit_vhost
   nova_ctl all restart
 }
 
 function db_joined {
   # tell mysql provider which database we want. it will create it and give us
   # credentials
-  juju-log "db_joined: requesting database access to $NOVA_DB for $DB_USER@`unit-get private-address`"
-  relation-set database=$NOVA_DB
-  relation-set username=$DB_USER
-  relation-set hostname=`unit-get private-address`
+  local nova_db=$(config-get nova-db)
+  local db_user=$(config-get db-user)
+  local hostname=$(unit-get private-address)
+  juju-log "$CHARM - db_joined: requesting database access to $nova_db for "\
+           "$db_user@$hostname"
+  relation-set database=$nova_db username=$db_user hostname=$hostname
 }
 
 function db_changed {
-  DB_HOST=`relation-get private-address`
-  DB_PASSWORD=`relation-get password`
-  if [[ -z $DB_HOST ]] || [[ -z $DB_PASSWORD ]] ; then
-    echo "db_changed: DB_HOST || DB_PASSWORD not yet set. Exit 0 and retry"
+  local db_host=`relation-get private-address`
+  local db_password=`relation-get password`
+
+  if [[ -z $db_host ]] || [[ -z $db_password ]] ; then
+    juju-log "$CHARM - db_changed: db_host||db_password set, will retry."
     exit 0
   fi
-  echo "db_changed: Configuring nova.conf for access to $NOVA_DB"
-  set_or_update sql_connection "mysql://$DB_USER:$DB_PASSWORD@$DB_HOST/$NOVA_DB"
-  nova_ctl all restart
-  # this works around lp #855971 until (ideally) we can add some functionality
-  # to nova/nova-manage to do this for us. reserve the IP of this host in the dhcp
-  # pool and assign it to this host
-  #DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
-  #IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
-  #apt-get -y install mysql-client
-  #mysql -u $DB_USER -h $DB_HOST -p$DB_PASSWORD -e \
-  #  "UPDATE fixed_ips SET reserved='1', host='$(hostname)' \
-  #     WHERE address='$IP'" $NOVA_DB
+
+  local nova_db=$(config-get nova-db)
+  local db_user=$(config-get db-user)
+  juju-log "$CHARM - db_changed: Configuring nova.conf for access to $nova_db"
+
+  set_or_update sql_connection "mysql://$db_user:$db_password@$db_host/$nova_db"
+  nova_ctl all stop
+  /usr/bin/nova-manage db sync
+  nova_ctl all start
 }
 
 function nova-network_changed {
