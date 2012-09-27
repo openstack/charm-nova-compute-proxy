@@ -1,18 +1,18 @@
-#!/bin/bash
-FORMULA_DIR=$(dirname $0)
+#!/bin/bash -e
+CHARM_DIR=$(dirname $0)
 ARG0=${0##*/}
 
-if [[ -e $FORMULA_DIR/nova-compute-common ]] ; then
-  . $FORMULA_DIR/nova-compute-common
+if [[ -e $CHARM_DIR/nova-compute-common ]] ; then
+  . $CHARM_DIR/nova-compute-common
 else
-  echo "ERROR: Could not load nova-compute-common from $FORMULA_DIR"
+  juju-log "ERROR: Could not load nova-compute-common from $CHARM_DIR"
 fi
 
 function install_hook {
   local virt_type=$(config-get virt-type)
   local compute_pkg=$(determine_compute_package "$virt_type")
   apt-get -y install python-software-properties || exit 1
-  add_ppa
+  configure_install_source $(config-get nova-release)
   apt-get update || exit 1
   apt-get -y install $compute_pkg $PACKAGES || exit 1
   nova_ctl all stop
@@ -114,7 +114,7 @@ function keystone_joined {
   #   https://lists.ubuntu.com/archives/juju/2012-March/001342.html
   # Once landed, this type of reconfiguration should happen in a hook
   # triggered by nova-cloud-controller's keystone relation.
-  apt-get -y install python-keystone 
+  apt-get -y install python-keystone
   relation-set service="None" region="None" public_url="None" \
                admin_url="None" internal_url="None"
   set_or_update "auth_strategy" "keystone"
