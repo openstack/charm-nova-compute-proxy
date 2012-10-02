@@ -7,8 +7,8 @@ CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
 
-if [[ -e $CHARM_DIR/lib/nova-common ]] ; then
-  . $CHARM_DIR/lib/nova-common
+if [[ -e $CHARM_DIR/lib/nova/nova-common ]] ; then
+  . $CHARM_DIR/lib/nova/nova-common
 else
   juju-log "$CHARM: Couldn't load $CHARM_DIR/lib/nova-common" && exit 1
 fi

@@ -103,7 +103,5 @@ nova_post_upgrade() {
   # RC3 packaging in cloud archive doesn't have this in postinst.  Do it here
   sed -e "s,^root_helper=.\+,rootwrap_config=/etc/nova/rootwrap.conf," -i /etc/nova/nova.conf
 
-  nova_ctl all restart
-
   juju-log "$CHARM: Post-upgrade hook complete: $upgrade_from -> folsom."
 }

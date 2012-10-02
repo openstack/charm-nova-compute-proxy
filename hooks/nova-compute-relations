@@ -15,7 +15,7 @@ function install_hook {
   configure_install_source $(config-get nova-release)
   apt-get update || exit 1
   apt-get -y install $compute_pkg $PACKAGES || exit 1
-  nova_ctl all stop
+  service_ctl all stop
 }
 
 function config_changed() {
@@ -34,7 +34,7 @@ function config_changed() {
   fi
 
   set_config_flags
-  nova_ctl all restart
+  service_ctl all restart
 }
 
 function amqp_joined {
@@ -68,7 +68,7 @@ function amqp_changed {
   set_or_update rabbit_userid $rabbit_user
   set_or_update rabbit_password $rabbit_password
   set_or_update rabbit_virtual_host $rabbit_vhost
-  nova_ctl all restart
+  service_ctl all restart
 }
 
 function db_joined {
@@ -96,9 +96,9 @@ function db_changed {
   juju-log "$CHARM - db_changed: Configuring nova.conf for access to $nova_db"
 
   set_or_update sql_connection "mysql://$db_user:$db_password@$db_host/$nova_db"
-  nova_ctl all stop
+  service_ctl all stop
   /usr/bin/nova-manage db sync
-  nova_ctl all start
+  service_ctl all start
 }
 
 function nova-network_changed {
@@ -108,7 +108,7 @@ function nova-network_changed {
     exit 0
   fi
   configure_network_manager $MANAGER
-  nova_ctl all restart
+  service_ctl all restart
 }
 
 function image-service_changed {
@@ -118,7 +118,7 @@ function image-service_changed {
     exit 0
   fi
   set_or_update glance_api_servers $GLANCE_API_SERVER
-  nova_ctl all restart
+  service_ctl all restart
 }
 
 function keystone_joined {
