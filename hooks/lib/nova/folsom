@@ -69,9 +69,11 @@ nova_post_upgrade() {
   # Packaging currently takes care of converting the Essex gflags format
   # to .ini, but we need to update the api-paste.ini manually.  It can be
   # updated directly from keystone, via the identity-service relation,
-  # if it exists.
+  # if it exists.  Only services that require keystone credentials will
+  # have modified api-paste.ini, and only those services will have a .dpkg-dist
+  # version present.
   local r_id=$(relation-ids identity-service)
-  if [[ -n "$r_id" ]] ; then
+  if [[ -n "$r_id" ]] && [[ -e "$CONF_DIR/api-paste.ini.dpkg-dist" ]] ; then
     # Backup the last api config, update the stock packaged version
     # with our current Keystone info.
     mv $API_CONF $CONF_DIR/api-paste.ini.juju-last
