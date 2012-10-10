@@ -107,6 +107,12 @@ function configure_install_source {
       error_out "Cannot install from Cloud Archive pocket $src " \
                 "on this Ubuntu version ($DISTRIB_CODENAME)!"
 
+    if [[ "$ca_rel" == "folsom/staging" ]] ; then
+      # cloud archive staging is just a regular PPA.
+      add-apt-repository -y ppa:ubuntu-cloud-archive/folsom-staging
+      return 0
+    fi
+
     case "$ca_rel" in
       "folsom"|"folsom/updates") pocket="precise-updates/folsom" ;;
       "folsom/proposed") pocket="precise-proposed/folsom" ;;
