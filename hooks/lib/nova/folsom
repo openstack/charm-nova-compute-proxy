@@ -64,6 +64,13 @@ nova_post_upgrade() {
   if [[ "$CHARM" == "nova-cloud-controller" ]] ; then
     juju-log "$CHARM: Migrating nova database."
     /usr/bin/nova-manage db sync
+
+    # Trigger a service restart on all other nova nodes.
+    local r_ids=$(relation-ids cloud-controller)
+    for r_id in $r_ids ; do
+      juju-log "$CHARM: Triggering a service restart on relation $r_id."
+      relation-set -r $r_id restart-trigger=$(uuid)
+    done
   fi
 
   # Packaging currently takes care of converting the Essex gflags format

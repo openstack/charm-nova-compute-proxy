@@ -20,3 +20,5 @@ requires:
     interface: glance
   network-manager:
     interface: nova-network
+  cloud-controller:
+    interface: nova

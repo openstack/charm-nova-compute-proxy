@@ -134,6 +134,15 @@ function keystone_joined {
   set_or_update "auth_strategy" "keystone"
 }
 
+function controller_changed {
+  # nova-c-c will send a unique uuid via this setting when we need to
+  # restart our services (ie, after a db migration or upgrade)
+  local restart_trigger=$(relation-get restart-trigger)
+  if [[ -n "$restart_trigger" ]] ; then
+    conditional_service_restart all "$restart_trigger"
+  fi
+}
+
 case $ARG0 in
   "install") install_hook ;;
   "start"|"stop") exit 0 ;;
@@ -148,6 +157,6 @@ case $ARG0 in
   "image-service-relation-changed") image-service_changed ;;
   "identity-service-relation-joined") keystone_joined ;;
   "identity-service-relation-changed") exit 0 ;;
+  "cloud-controller-relation-joined" ) exit 0 ;;
+  "cloud-controller-relation-changed") controller_changed ;;
 esac
-
-
