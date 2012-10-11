@@ -96,9 +96,7 @@ function db_changed {
   juju-log "$CHARM - db_changed: Configuring nova.conf for access to $nova_db"
 
   set_or_update sql_connection "mysql://$db_user:$db_password@$db_host/$nova_db"
-  service_ctl all stop
-  /usr/bin/nova-manage db sync
-  service_ctl all start
+  service_ctl all restart
 }
 
 function nova-network_changed {
