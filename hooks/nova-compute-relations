@@ -119,6 +119,60 @@ function keystone_joined {
   set_or_update "auth_strategy" "keystone"
 }
 
+function ceph_joined {
+  mkdir -p /etc/ceph
+  apt-get -y install ceph-common || exit 1
+}
+
+function ceph_changed {
+  SERVICE_NAME=`echo $JUJU_UNIT_NAME | cut -d / -f 1`
+  KEYRING=/etc/ceph/ceph.client.$SERVICE_NAME.keyring
+  KEY=`relation-get key`
+  if [ -n "$KEY" ]; then
+    # But only once
+    if [ ! -f $KEYRING ]; then
+      ceph-authtool $KEYRING \
+        --create-keyring --name=client.$SERVICE_NAME \
+        --add-key="$KEY"
+      chmod +r $KEYRING
+    fi
+  else
+    # No key - bail for the time being
+    exit 0
+  fi
+
+  MONS=`relation-list`
+  mon_hosts=""
+  for mon in $MONS; do
+    mon_hosts="$mon_hosts `relation-get private-address $mon`:6789"
+  done
+  cat > /etc/ceph/ceph.conf << EOF
+[global]
+ auth supported = cephx
+ keyring = /etc/ceph/\$cluster.\$name.keyring
+ mon host = $mon_hosts
+EOF
+
+  if [ ! -f /etc/ceph/secret.xml ]; then
+    cat > /etc/ceph/secret.xml << EOF
+<secret ephemeral='no' private='no'>
+   <usage type='ceph'>
+     <name>client.$SERVICE_NAME secret</name>
+   </usage>
+</secret>
+EOF
+    # Create secret for libvirt usage
+    # note that this does limit ceph usage to 
+    # KVM only at this point in time.
+    uuid=$(virsh secret-define --file /etc/ceph/secret.xml | cut -d " " -f 2)
+    virsh secret-set-value --secret $uuid --base64 $KEY
+    set_or_update rbd_user $SERVICE_NAME
+    set_or_update rbd_secret_uuid $uuid
+    set_or_update rbd_pool nova
+    nova_ctl all restart
+  fi  
+}
+
 case $ARG0 in
   "install") install_hook ;;
   "start"|"stop") exit 0 ;;
@@ -133,6 +187,8 @@ case $ARG0 in
   "image-service-relation-changed") image-service_changed ;;
   "identity-service-relation-joined") keystone_joined ;;
   "identity-service-relation-changed") exit 0 ;;
+  "ceph-relation-joined") ceph_joined;;
+  "ceph-relation-changed") ceph_changed;;
 esac
 
 
