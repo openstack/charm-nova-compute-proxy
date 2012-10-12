@@ -12,7 +12,7 @@ function install_hook {
   local virt_type=$(config-get virt-type)
   local compute_pkg=$(determine_compute_package "$virt_type")
   apt-get -y install python-software-properties || exit 1
-  configure_install_source $(config-get nova-release)
+  configure_install_source $(config-get openstack-origin)
   apt-get update || exit 1
   apt-get -y install $compute_pkg $PACKAGES || exit 1
   service_ctl all stop
@@ -21,9 +21,9 @@ function install_hook {
 function config_changed() {
 
   # Determine whether or not we should do an upgrade, based on whether or not
-  # the version offered in nova-release is greater than what is installed.
+  # the version offered in openstack-origin is greater than what is installed.
 
-  local install_src=$(config-get nova-release)
+  local install_src=$(config-get openstack-origin)
   local cur=$(get_os_codename_package "nova-common")
   local available=$(get_os_codename_install_source "$install_src")
 
