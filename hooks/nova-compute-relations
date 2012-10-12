@@ -16,6 +16,7 @@ function install_hook {
   apt-get update || exit 1
   apt-get -y install $compute_pkg $PACKAGES || exit 1
   service_ctl all stop
+  set_or_update "auth_strategy" "keystone"
 }
 
 function config_changed() {
@@ -99,16 +100,6 @@ function db_changed {
   service_ctl all restart
 }
 
-function nova-network_changed {
-  MANAGER=`relation-get network_manager`
-  if [[ -z $MANAGER ]] ; then
-    echo "nova-network_changed: MANAGER not yet set. Exit 0 and retry"
-    exit 0
-  fi
-  configure_network_manager $MANAGER
-  service_ctl all restart
-}
-
 function image-service_changed {
   GLANCE_API_SERVER=`relation-get glance-api-server`
   if [[ -z $GLANCE_API_SERVER ]] ; then
@@ -119,26 +110,17 @@ function image-service_changed {
   service_ctl all restart
 }
 
-function keystone_joined {
-  # service=None lets keystone know we don't need anything entered
-  # into the service catalog.  This hook exists to workaround lack
-  # of features explained here:
-  #   https://lists.ubuntu.com/archives/juju/2012-March/001342.html
-  # Once landed, this type of reconfiguration should happen in a hook
-  # triggered by nova-cloud-controller's keystone relation.
-  apt-get -y install python-keystone
-  relation-set service="None" region="None" public_url="None" \
-               admin_url="None" internal_url="None"
-  set_or_update "auth_strategy" "keystone"
-}
-
-function controller_changed {
-  # nova-c-c will send a unique uuid via this setting when we need to
-  # restart our services (ie, after a db migration or upgrade)
-  local restart_trigger=$(relation-get restart-trigger)
-  if [[ -n "$restart_trigger" ]] ; then
-    conditional_service_restart all "$restart_trigger"
+function compute_changed {
+  # nova-c-c will inform us of the configured network manager.  nova-compute
+  # needs to configure itself accordingly.
+  network_manager=`relation-get network_manager`
+  if [[ -n "$network_manager" ]] ; then
+    configure_network_manager "$network_manager"
   fi
+
+  # restart on all changed events. nova-c-c may send out a uuid to trigger
+  # remote restarts of services here (after db migrations, for instance)
+  service_ctl all restart
 }
 
 case $ARG0 in
@@ -149,12 +131,8 @@ case $ARG0 in
   "amqp-relation-changed") amqp_changed ;;
   "shared-db-relation-joined") db_joined ;;
   "shared-db-relation-changed") db_changed ;;
-  "network-manager-relation-joined") exit 0 ;;
-  "network-manager-relation-changed") nova-network_changed ;;
   "image-service-relation-joined") exit 0 ;;
   "image-service-relation-changed") image-service_changed ;;
-  "identity-service-relation-joined") keystone_joined ;;
-  "identity-service-relation-changed") exit 0 ;;
-  "cloud-controller-relation-joined" ) exit 0 ;;
-  "cloud-controller-relation-changed") controller_changed ;;
+  "cloud-compute-relation-joined" ) exit 0 ;;
+  "cloud-compute-relation-changed") compute_changed ;;
 esac

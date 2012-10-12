@@ -66,11 +66,7 @@ nova_post_upgrade() {
     /usr/bin/nova-manage db sync
 
     # Trigger a service restart on all other nova nodes.
-    local r_ids=$(relation-ids cloud-controller)
-    for r_id in $r_ids ; do
-      juju-log "$CHARM: Triggering a service restart on relation $r_id."
-      relation-set -r $r_id restart-trigger=$(uuid)
-    done
+    trigger_remote_service_restarts
   fi
 
   # Packaging currently takes care of converting the Essex gflags format

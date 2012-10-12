@@ -1,4 +1,3 @@
-ensemble: formula
 name: nova-compute
 summary: "OpenStack compute"
 maintainer: Adam Gandelman <adamg@canonical.com>
@@ -14,11 +13,5 @@ requires:
     interface: mysql-shared
   amqp:
     interface: rabbitmq
-  identity-service:
-    interface: keystone
   image-service:
     interface: glance
-  network-manager:
-    interface: nova-network
-  cloud-controller:
-    interface: nova

@@ -54,6 +54,22 @@ function configure_network_manager {
   esac
 }
 
+function trigger_remote_service_restarts() {
+  # Trigger a service restart on all other nova nodes that have a relation
+  # via the cloud-controller interface.
+
+  # possible relations to other nova services.
+  local relations="cloud-compute nova-volume-service"
+
+  for rel in $relations; do
+    local r_ids=$(relation-ids $rel)
+    for r_id in $r_ids ; do
+      juju-log "$CHARM: Triggering a service restart on relation $r_id."
+      relation-set -r $r_id restart-trigger=$(uuid)
+    done
+  done
+}
+
 do_openstack_upgrade() {
   # update openstack components to those provided by a new installation source
   # it is assumed the calling hook has confirmed that the upgrade is sane.
