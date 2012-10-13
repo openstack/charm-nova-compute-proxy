@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 CHARM="nova-compute"
-PACKAGES="nova-compute nova-api nova-network"
-SERVICES="$PACKAGES"
+PACKAGES="nova-compute nova-api nova-network python-keystone"
+SERVICES="nova-compute nova-api nova-network"
 CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
