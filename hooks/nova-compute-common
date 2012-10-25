@@ -1,81 +1,32 @@
-#!/bin/bash
-SERVICES="nova-compute nova-network nova-api"
-NOVA_RELEASE=$(config-get nova-release)
+#!/bin/bash -e
+
+CHARM="nova-compute"
+PACKAGES="nova-compute nova-api nova-network python-keystone"
+SERVICES="nova-compute nova-api nova-network"
+CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
-RABBIT_USER=$(config-get rabbit-user)
-RABBIT_VHOST=$(config-get rabbit-vhost)
-DB_USER=$(config-get db-user)
-NOVA_DB=$(config-get nova-db)
-NETWORK_MANAGER=$(config-get network-manager)
-NETWORK_BRIDGE=$(config-get bridge-interface)
-BRIDGE_IP=$(config-get bridge-ip)
-BRIDGE_NETMASK=$(config-get bridge-netmask)
-PPA=$(config-get nova-release)
-VIRT_TYPE=$(config-get virt-type)
+API_CONF="/etc/nova/api-paste.ini"
 
-function set_or_update {
-  # set or update a key=value config option in nova.conf
-  KEY=$1
-  VALUE=$2
-  [[ -z $KEY ]] && exit 1
-  [[ -z $VALUE ]] && exit 1
-  cat $NOVA_CONF | grep "\-\-$KEY=$VALUE" >/dev/null \
-   && juju-log "nova-compute: $KEY=$VALUE already set" exit 0
-  if cat $NOVA_CONF | grep "\-\-$KEY=" >/dev/null ; then
-    sed -i "s|\(--$KEY=\).*|\1$VALUE|" $NOVA_CONF
-  else
-    echo "--$KEY=$VALUE" >>$NOVA_CONF
-  fi
-}
+if [[ -e $CHARM_DIR/lib/nova/nova-common ]] ; then
+  . $CHARM_DIR/lib/nova/nova-common
+else
+  juju-log "$CHARM: Couldn't load $CHARM_DIR/lib/nova-common" && exit 1
+fi
 
-function set_config_flags() {
-  # Set user-defined nova.conf flags from deployment config
-  juju-log "Processing config-flags."
-  flags=$(config-get config-flags)
-  if [[ "$flags" != "None" && -n "$flags" ]] ; then
-    for f in $(echo $flags | sed -e 's/,/ /g') ; do
-      k=$(echo $f | cut -d= -f1)
-      v=$(echo $f | cut -d= -f2)
-      set_or_update "$k" "$v"
-    done
-  fi
-}
-
-function nova_ctl_status {
-  SERVICE=$1
-  # workaround upstarts lack of scriptable return codes
-  STATUS=$(service $SERVICE status | cut -d/ -f1 | awk '{ print $2 }')
-  case $STATUS in
-    "start") return 0 ;;
-    "stop") return 1 ;;
-    *) echo "ERROR: Unexpected status of service $SERVICE: $STATUS" && exit 1 ;;
+determine_compute_package() {
+  # determines the appropriate nova-compute package to install
+  # for the configured virt-type.
+  local virt_type="$1"
+  local compute_pkg=""
+  case $virt_type in
+    "kvm") compute_pkg="nova-compute-kvm";;
+    "qemu") compute_pkg="nova-compute-qemu";;
+    "xen") compute_pkg="nova-compute-xen";;
+    "uml") compute_pkg="nova-compute-uml";;
+    "lxc") compute_pkg="nova-compute-lxc";;
+    *) error_out" ERROR: Unsupported virt_type=$virt_type";;
   esac
-}
-
-function nova_ctl {
-  if [[ $1 == "all" ]] ; then
-    CTL=$SERVICES
-  else
-    CTL=$1
-  fi
-  ACTION=$2
-  if [[ -z $CTL ]] || [[ -z $ACTION ]] ; then
-    juju-log "ERROR nova_ctl: Not enough arguments"
-    exit 1
-  fi
-  for i in $CTL ; do
-    case $ACTION in
-      "start")
-        nova_ctl_status $i || service $i start ;;
-      "stop")
-        nova_ctl_status $i && service $i stop || return 0 ;;
-      "restart")
-        nova_ctl_status $i && service $i restart || service $i start ;;
-    esac
-    if [[ $? != 0 ]] ; then
-      juju-log "nova_ctl: ERROR - Service $i failed to $ACTION"
-    fi
-  done
+  echo "$compute_pkg"
 }
 
 function setup_bridge {
@@ -109,65 +60,27 @@ function configure_network_manager {
   # to be expanded later to cover flatDhcp and VLAN
   echo "$0: configuring $1 network manager"
 
-  NETWORK_BRIDGE=$(config-get bridge-interface)
+  local network_bridge=$(config-get bridge-interface)
 
   case $1 in
     "FlatManager")
-      setup_bridge $NETWORK_BRIDGE $BRIDGE_IP $BRIDGE_NETMASK
+      local bridge_ip=$(config-get bridge-ip)
+      local bridge_netmask=$(config-get bridge-netmask)
+      setup_bridge $network_bridge $bridge_ip $bridge_netmask
       set_or_update network_manager nova.network.manager.FlatManager
-      set_or_update flat_network_bridge $NETWORK_BRIDGE
+      set_or_update flat_network_bridge $network_bridge
       ;;
     "FlatDHCPManager")
-      FLAT_INTERFACE=$(config-get flat-interface)
-      EC2_HOST=$(relation-get ec2_host)
-      [[ -z $EC2_HOST ]] && juju-log "nova-compute: Missing EC2_HOST" \
+      local flat_interface=$(config-get flat-interface)
+      local ec2_host=$(relation-get ec2_host)
+      [[ -z $ec2_host ]] && juju-log "nova-compute: Missing ec2_host" \
         && exit 0
       set_or_update network_manager nova.network.manager.FlatDHCPManager
       # the interface on which bridge is built
-      set_or_update flat_interface $FLAT_INTERFACE
+      set_or_update flat_interface $flat_interface
       # address of API server to forward requests
-      set_or_update ec2_dmz_host $EC2_HOST
+      set_or_update ec2_dmz_host $ec2_host
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
-}
-
-function add_ppa {
-  # Install from archive instead of PPA.
-  [[ $PPA == "distro" ]] && return 0
-  . /etc/lsb-release
-  [[ -z $PPA ]] && return 0
-  # if referenced by name, setup ppa to upstream PPAs
-  if [[ "$PPA" == "trunk" ]] ||
-     [[ "$PPA" == "milestone" ]] ||
-     [[ "$PPA" == "milestone-proposed" ]] ; then
-      juju-log "nova: Configuring installation from upstream PPA ($PPA)"
-      PPA_URL="deb http://ppa.launchpad.net/nova-core/$PPA/ubuntu $DISTRIB_CODENAME main"
-      add-apt-repository "$PPA_URL" || exit 1
-      return
-  fi
-  if [[ "${PPA:0:4}" == "ppa:" ]] ; then
-    juju-log "nova: Configuring installation from custom PPA ($PPA)"
-    add-apt-repository -y "$PPA" || exit 1
-    return
-  fi
-  if [[ "${PPA:0:3}" == "deb" ]] ; then
-    juju-log "nova: Configuring installation from custom PPA URL ($PPA)"
-    if echo "$PPA" | grep -q "|" ; then
-      # gpg key id tagged to end of url folloed by a |
-      url=$(echo $PPA | cut -d'|' -f1)
-      key=$(echo $PPA | cut -d'|' -f2)
-      if [[ -n "$key" ]] ; then
-        juju-log "Importing repository key: $key"
-        apt-key adv --keyserver keyserver.ubuntu.com --recv-keys "$key" || \
-          juju-log "WARN: Could not import key from keyserver: $key"
-      else
-        juju-log "No repository key specified"
-        url="$PPA"
-      fi
-      add-apt-repository -y "$url"
-    fi
-    return
-  fi
-  juju-log "nova: No PPA specified. Falling back to installation from Ubuntu archive."
 }
