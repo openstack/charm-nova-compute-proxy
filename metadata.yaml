@@ -20,3 +20,5 @@ requires:
     interface: glance
   network-manager:
     interface: nova-network
+  ceph:
+    interface: ceph-client
