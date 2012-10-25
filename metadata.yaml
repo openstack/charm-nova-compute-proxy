@@ -15,3 +15,5 @@ requires:
     interface: rabbitmq
   image-service:
     interface: glance
+  ceph:
+    interface: ceph-client
