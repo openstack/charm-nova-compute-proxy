@@ -81,6 +81,19 @@ function configure_network_manager {
       # address of API server to forward requests
       set_or_update ec2_dmz_host $ec2_host
       ;;
+    "Quantum")
+      set_or_update "network_api_class" "nova.network.quantumv2.api.API"
+      set_or_update "quantum_auth_strategy" "keystone"
+      set_or_update "quantum_url" "http://$(relation-get quantum_host):9696"
+      set_or_update "quantum_admin_tenant_name" "$(relation-get service_tenant)"
+      set_or_update "quantum_admin_username" "$(relation-get service_username)"
+      set_or_update "quantum_admin_password" "$(relation-get service_password)"
+      set_or_update "quantum_admin_auth_url" \
+                    "http://$(relation-get keystone_host):$(relation-get auth_port)/v2.0"
+      # TODO: pass plugin type over relations for dynamic configuration
+      set_or_update "libvirt_vif_driver" "nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver"
+      set_or_update "libvirt_use_virtio_for_bridges" "True"
+      ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
 }
