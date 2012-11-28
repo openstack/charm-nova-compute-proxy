@@ -120,7 +120,7 @@ function compute_changed {
 
   # nova-c-c informs us of what volume service has been deployed.
   volume_service=`relation-get volume_service`
-  configure_volume_service "$volume_service"
+  [[ -n "$volume_service" ]] && configure_volume_service "$volume_service"
 
   # restart on all changed events. nova-c-c may send out a uuid to trigger
   # remote restarts of services here (after db migrations, for instance)
