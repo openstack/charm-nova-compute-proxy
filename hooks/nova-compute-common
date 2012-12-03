@@ -1,11 +1,38 @@
 #!/bin/bash -e
 
 CHARM="nova-compute"
-PACKAGES="nova-compute nova-api nova-network python-keystone"
-SERVICES="nova-compute nova-api nova-network"
+PACKAGES="nova-compute python-keystone"
+SERVICES="nova-compute"
 CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
+QUANTUM_CONF="/etc/quantum/quantum.conf"
+
+NET_MANAGER=$(config-get network-manager)
+if [ "$NET_MANAGER" == "Quantum" ]; then
+  QUANTUM_PLUGIN=$(config-get quantum-plugin)
+  case $QUANTUM_PLUGIN in
+    "ovs")
+      PACKAGES="$PACKAGES quantum-plugin-openvswitch-agent"
+      EARLY_PACKAGES="openvswitch-datapath-dkms" # OVS needs DKMS for GRE tunnels
+      SERVICES="$SERVICES quantum-plugin-openvswitch-agent"
+      QUANTUM_CORE_PLUGIN="quantum.plugins.openvswitch.ovs_quantum_plugin.OVSQuantumPluginV2"
+      QUANTUM_PLUGIN_CONF="/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini"
+      ;;
+    "nvp")
+      # TODO: This needs to be changed - but leaving hook in for the time being
+      PACKAGES="$PACKAGES quantum-plugin-nicira"
+      QUANTUM_CORE_PLUGIN="quantum.plugins.nicira.nicira_nvp_plugin.QuantumPlugin.NvpPluginV2"
+      QUANTUM_PLUGIN_CONF="/etc/quantum/plugins/nicira/nvp.ini"
+      ;;
+     *)
+      juju-log "Unrecognised plugin for quantum: $QUANTUM_PLUGIN" && exit 1
+      ;;
+  esac
+else
+  PACKAGES="$PACKAGES nova-api nova-network"
+  SERVICES="$SERVICES nova-api nova-network"
+fi
 
 if [[ -e $CHARM_DIR/lib/nova/nova-common ]] ; then
   . $CHARM_DIR/lib/nova/nova-common
@@ -90,10 +117,40 @@ function configure_network_manager {
       set_or_update "quantum_admin_password" "$(relation-get service_password)"
       set_or_update "quantum_admin_auth_url" \
                     "http://$(relation-get keystone_host):$(relation-get auth_port)/v2.0"
-      # TODO: pass plugin type over relations for dynamic configuration
-      set_or_update "libvirt_vif_driver" "nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver"
-      set_or_update "libvirt_use_virtio_for_bridges" "True"
+      set_or_update "core_plugin" "$QUANTUM_CORE_PLUGIN" "$QUANTUM_CONF"
+      set_or_update "bind_host" "$(unit-get private-address)" "$QUANTUM_CONF"
+      case $QUANTUM_PLUGIN in
+        "ovs")
+          set_or_update "libvirt_vif_driver" "nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver"
+          set_or_update "libvirt_use_virtio_for_bridges" "True"
+          set_or_update "tenant_network_type" "gre" $QUANTUM_PLUGIN_CONF "OVS"
+          set_or_update "enable_tunneling" "True" $QUANTUM_PLUGIN_CONF "OVS"
+          set_or_update "tunnel_id_ranges" "1:1000" $QUANTUM_PLUGIN_CONF "OVS"
+          set_or_update "local_ip" "$(unit-get private-address)" $QUANTUM_PLUGIN_CONF "OVS"
+          ;;
+      esac
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
+}
+
+BR_INT="br-int"
+
+function configure_quantum_bridge {
+  if ! ovs-vsctl show | grep -q "Bridge $BR_INT"; then
+    ovs-vsctl add-br $BR_INT
+  fi
+}
+
+function configure_libvirt {
+  cat > /etc/libvirt/qemu.conf << EOF
+# File installed by Juju nova-compute charm
+cgroup_device_acl = [
+   "/dev/null", "/dev/full", "/dev/zero",
+   "/dev/random", "/dev/urandom",
+   "/dev/ptmx", "/dev/kvm", "/dev/kqemu",
+   "/dev/rtc", "/dev/hpet", "/dev/net/tun",
+]
+EOF
+  service libvirt-bin reload
 }
