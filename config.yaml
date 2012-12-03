@@ -80,7 +80,6 @@ options:
       Quantum plugin to use for network management; supports
       .
         ovs - OpenvSwitch Plugin
-        nvp - Nicira NVP Plugin
       .
       This configuration only has context when used with
       network-manager Quantum.
