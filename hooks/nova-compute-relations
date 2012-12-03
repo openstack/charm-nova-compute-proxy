@@ -12,7 +12,7 @@ function install_hook {
   local virt_type=$(config-get virt-type)
   local compute_pkg=$(determine_compute_package "$virt_type")
   apt-get -y install python-software-properties || exit 1
-  configure_install_source $(config-get openstack-origin)
+  configure_install_source "$(config-get openstack-origin)"
   apt-get update || exit 1
   if [ -n "$EARLY_PACKAGES" ]; then
     apt-get -y install $EARLY_PACKAGES || exit 1
@@ -148,6 +148,10 @@ function compute_changed {
     fi
     configure_network_manager "$network_manager"
   fi
+
+  # nova-c-c informs us of what volume service has been deployed.
+  volume_service=`relation-get volume_service`
+  [[ -n "$volume_service" ]] && configure_volume_service "$volume_service"
 
   # restart on all changed events. nova-c-c may send out a uuid to trigger
   # remote restarts of services here (after db migrations, for instance)
