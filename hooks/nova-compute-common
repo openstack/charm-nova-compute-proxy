@@ -109,6 +109,9 @@ function configure_network_manager {
       set_or_update ec2_dmz_host $ec2_host
       ;;
     "Quantum")
+      local keystone_host=$(relation-get keystone_host)
+      [[ -z $keystone_host ]] && juju-log "nova-compute: Missing keystone host" \
+        && exit 0
       set_or_update "network_api_class" "nova.network.quantumv2.api.API"
       set_or_update "quantum_auth_strategy" "keystone"
       set_or_update "quantum_url" "http://$(relation-get quantum_host):9696"
