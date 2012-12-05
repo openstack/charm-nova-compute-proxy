@@ -129,6 +129,7 @@ function configure_network_manager {
       set_or_update "quantum_admin_password" "$(relation-get service_password)"
       set_or_update "quantum_admin_auth_url" \
                     "http://$(relation-get keystone_host):$(relation-get auth_port)/v2.0"
+      set_or_update "force_config_drive" "True"
       case $quantum_plugin in
         "ovs")
           apt-get -y install openvswitch-datapath-dkms
