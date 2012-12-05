@@ -87,6 +87,7 @@ function configure_network_manager {
   local net_manager=$1
   local quantum_plugin=$2
   local network_bridge=$(config-get bridge-interface)
+  local private_address=$(get_ip `unit-get private-address`)
 
   # Store the network manager and quantum plugin
   # for use in later hook invocations
@@ -139,11 +140,11 @@ function configure_network_manager {
           set_or_update "tenant_network_type" "gre" $quantum_plugin_conf "OVS"
           set_or_update "enable_tunneling" "True" $quantum_plugin_conf "OVS"
           set_or_update "tunnel_id_ranges" "1:1000" $quantum_plugin_conf "OVS"
-          set_or_update "local_ip" "$(unit-get private-address)" $quantum_plugin_conf "OVS"
+          set_or_update "local_ip" "$private_address" $quantum_plugin_conf "OVS"
           SERVICES="$SERVICES quantum-plugin-openvswitch-agent"
           ;;
       esac
-      set_or_update "bind_host" "$(unit-get private-address)" "$QUANTUM_CONF"
+      set_or_update "bind_host" "$private_address" "$QUANTUM_CONF"
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac

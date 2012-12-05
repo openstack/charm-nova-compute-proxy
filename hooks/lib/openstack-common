@@ -178,3 +178,23 @@ get_os_version_codename() {
     "grizzly") echo "2012.3" ;;
   esac
 }
+
+get_ip() {
+  hostname=$1
+  python -c "
+import dns.resolver
+import dns.ipv4
+try:
+  # Test to see if already an IPv4 address
+  dns.ipv4.inet_aton('$hostname')
+  print '$hostname'
+except dns.exception.SyntaxError:
+  pass
+try:
+  answers = dns.resolver.query('$hostname', 'A')
+  if answers:
+    print answers[0].address
+except dns.resolver.NXDOMAIN:
+  pass
+"
+}
