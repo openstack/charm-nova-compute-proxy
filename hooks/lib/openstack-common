@@ -180,7 +180,10 @@ get_os_version_codename() {
 }
 
 get_ip() {
-  hostname=$1
+  dpkg -l | grep -q python-dnspython || {
+    apt-get -y install python-dnspython
+  }
+  local hostname=$1
   python -c "
 import dns.resolver
 import dns.ipv4
