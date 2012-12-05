@@ -144,7 +144,7 @@ function configure_network_manager {
           SERVICES="$SERVICES quantum-plugin-openvswitch-agent"
           ;;
       esac
-      set_or_update "bind_host" "$private_address" "$QUANTUM_CONF"
+      set_or_update "bind_host" "0.0.0.0" "$QUANTUM_CONF"
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
