@@ -192,12 +192,11 @@ try:
   dns.ipv4.inet_aton('$hostname')
   print '$hostname'
 except dns.exception.SyntaxError:
-  pass
-try:
-  answers = dns.resolver.query('$hostname', 'A')
-  if answers:
-    print answers[0].address
-except dns.resolver.NXDOMAIN:
-  pass
+  try:
+    answers = dns.resolver.query('$hostname', 'A')
+    if answers:
+      print answers[0].address
+  except dns.resolver.NXDOMAIN:
+    pass
 "
 }
