@@ -20,10 +20,7 @@ function install_hook {
   apt-get -y install $compute_pkg $PACKAGES || exit 1
   service_ctl all stop
   set_or_update "auth_strategy" "keystone"
-  if [ "$NET_MANAGER" == "Quantum" ]; then
-    configure_quantum_bridge
-    configure_libvirt
-  fi
+  configure_libvirt
 }
 
 function config_changed() {
@@ -77,7 +74,7 @@ function amqp_changed {
   set_or_update rabbit_password $rabbit_password
   set_or_update rabbit_virtual_host $rabbit_vhost
 
-  if [ "$(config-get network-manager)" == "Quantum" ]; then
+  if [ "$NET_MANAGER" == "Quantum" ]; then
     set_or_update rabbit_host "$rabbit_host" "$QUANTUM_CONF"
     set_or_update rabbit_userid "$rabbit_user" "$QUANTUM_CONF"
     set_or_update rabbit_password "$rabbit_password" "$QUANTUM_CONF"
@@ -140,13 +137,39 @@ function compute_changed {
   # needs to configure itself accordingly.
   network_manager=`relation-get network_manager`
   if [[ -n "$network_manager" ]] ; then
-    # Check locally configured network manager matches that provided
-    # from cloud controller - otherwise stuff will break.
-    if [ "$network_manager" != "$NET_MANAGER" ] ; then
-        juju-log "Locally configured network manager does not match cloud controller"
-        exit 1
+    if [ "$network_manager" == "Quantum" ]; then
+      configure_network_manager "$network_manager" "$(relation-get quantum_plugin)"
+      configure_quantum_bridge
+      # Quantum also needs access to the quantum database
+      # depending on add-relation order, this relation
+      # may already be present so ask it for credentials if so
+      r_ids="$(relation-ids shared-db)"
+      for id in $r_ids ; do
+        relation-set -r $id \
+          quantum_database=quantum \
+          quantum_username=quantum \
+          quantum_hostname=$(unit-get private-address)
+      done
+      # Rabbit MQ relation may also already be in place
+      # shared vhost with nova so just grab settings and
+      # configure
+      r_ids="$(relation-ids amqp)"
+      for id in $r_ids ; do
+        for unit in $(relation-list -r $id) ; do
+          local rabbit_host=$(relation-get -r $id private-address $unit)
+          local rabbit_password=$(relation-get -r $id password $unit)
+          if [[ -n $rabbit_host ]] && \
+             [[ -n $rabbit_password ]]; then
+            set_or_update rabbit_host "$rabbit_host" "$QUANTUM_CONF"
+            set_or_update rabbit_userid "$(config-get rabbit-user)" "$QUANTUM_CONF"
+            set_or_update rabbit_password "$rabbit_password" "$QUANTUM_CONF"
+            set_or_update rabbit_virtual_host "$(config-get rabbit-vhost)" "$QUANTUM_CONF"
+          fi
+        done
+      done
+    else
+      configure_network_manager "$network_manager"
     fi
-    configure_network_manager "$network_manager"
   fi
 
   # nova-c-c informs us of what volume service has been deployed.

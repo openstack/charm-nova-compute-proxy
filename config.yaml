@@ -38,18 +38,6 @@ options:
     default: kvm
     type: string
     description: "Virtualization flavor. Supported: kvm, xen, uml, lxc. qemu"
-  network-manager:
-    default: FlatDHCPManager
-    type: string
-    description: |
-      Network manager for the cloud; supports the following options
-      .
-        FlatDHCPManager (nova-network) (default)
-        FlatManager (nova-network)
-        Quantum (Full SDN solution)
-      .
-      When using the Quantum option you will most likely want to use
-      the quantum charm to provide L3 routing and DHCP Services.
   # needed if using flatmanager
   bridge-interface:
     default: br100
@@ -72,14 +60,3 @@ options:
     default: None
     type: string
     description: Comma separated list of key=value config flags to be set in nova.conf.
-  # needed if using Quantum
-  quantum-plugin:
-    default: ovs
-    type: string
-    description: |
-      Quantum plugin to use for network management; supports
-      .
-        ovs - OpenvSwitch Plugin
-      .
-      This configuration only has context when used with
-      network-manager Quantum.
