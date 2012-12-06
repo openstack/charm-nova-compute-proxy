@@ -90,8 +90,10 @@ function configure_network_manager {
   local private_address=$(get_ip `unit-get private-address`)
   # Check to ensure we can actually resolve
   # the local unit IP address
-  [[ -n $private_address ]] || juju-log "Unable to resolve local IP address" \
-    && exit 1
+  [[ -n $private_address ]] || {
+    juju-log "Unable to resolve local IP address"
+    exit 1
+  }
 
   # Store the network manager and quantum plugin
   # for use in later hook invocations
