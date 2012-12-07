@@ -178,3 +178,25 @@ get_os_version_codename() {
     "grizzly") echo "2012.3" ;;
   esac
 }
+
+get_ip() {
+  dpkg -l | grep -q python-dnspython || {
+    apt-get -y install python-dnspython 2>&1 > /dev/null
+  }
+  hostname=$1
+  python -c "
+import dns.resolver
+import socket
+try:
+  # Test to see if already an IPv4 address
+  socket.inet_aton('$hostname')
+  print '$hostname'
+except socket.error:
+  try:
+    answers = dns.resolver.query('$hostname', 'A')
+    if answers:
+      print answers[0].address
+  except dns.resolver.NXDOMAIN:
+    pass
+"
+}

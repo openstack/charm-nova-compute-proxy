@@ -8,9 +8,13 @@ nova_set_or_update() {
   local key="$1"
   local value="$2"
   local conf_file="$3"
+  local section="${4:-DEFAULT}"
 
   local nova_conf=${NOVA_CONF:-/etc/nova/nova.conf}
   local api_conf=${API_CONF:-/etc/nova/api-paste.ini}
+  local quantum_conf=${QUANTUM_CONF:-/etc/quantum/quantum.conf}
+  local quantum_api_conf=${QUANTUM_API_CONF:-/etc/quantum/api-paste.ini}
+  local quantum_plugin_conf=${QUANTUM_PLUGIN_CONF:-/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini}
 
   [[ -z $key ]] && juju-log "$CHARM: set_or_update: value $value missing key" && exit 1
   [[ -z $value ]] && juju-log "$CHARM: set_or_update: key $key missing value" && exit 1
@@ -27,19 +31,39 @@ nova_set_or_update() {
                  pattern="$match"
                  out="$key = "
                  ;;
+    "$quantum_conf"|"$quantum_api_conf"|"$quantum_plugin_conf")
+                 match="^$key = "
+                 pattern="$match"
+                 out="$key = "
+                 ;;
     *) juju-log "$CHARM ERROR: set_or_update: Invalid conf_file ($conf_file)"
   esac
 
   cat $conf_file | grep "$match$value" >/dev/null &&
     juju-log "$CHARM: $key=$value already in set in $conf_file" \
       && return 0
-  if cat $conf_file | grep "$match" >/dev/null ; then
-    juju-log "$CHARM: Updating $conf_file, $key=$value"
-    sed -i "s|\($pattern\).*|\1$value|" $conf_file
-  else
-    juju-log "$CHARM: Setting new option $key=$value in $conf_file"
-    echo "$out$value" >>$conf_file
-  fi
+
+  case $conf_file in
+    "$quantum_conf"|"$quantum_api_conf"|"$quantum_plugin_conf")
+        python -c "
+import ConfigParser
+config = ConfigParser.RawConfigParser()
+config.read('$conf_file')
+config.set('$section','$key','$value')
+with open('$conf_file', 'wb') as configfile:
+    config.write(configfile)
+"
+      ;;
+    *)
+      if cat $conf_file | grep "$match" >/dev/null ; then
+        juju-log "$CHARM: Updating $conf_file, $key=$value"
+        sed -i "s|\($pattern\).*|\1$value|" $conf_file
+      else
+        juju-log "$CHARM: Setting new option $key=$value in $conf_file"
+        echo "$out$value" >>$conf_file
+      fi
+      ;;
+  esac
 }
 
 # Upgrade Helpers

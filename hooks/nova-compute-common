@@ -1,11 +1,36 @@
 #!/bin/bash -e
 
 CHARM="nova-compute"
-PACKAGES="nova-compute nova-api nova-network python-keystone"
-SERVICES="nova-compute nova-api nova-network"
+PACKAGES="nova-compute python-keystone genisoimage"
+SERVICES="nova-compute"
 CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
+QUANTUM_CONF="/etc/quantum/quantum.conf"
+
+if [ -f /etc/nova/nm.conf ]; then
+    NET_MANAGER=$(cat /etc/nova/nm.conf)
+fi
+case $NET_MANAGER in
+  "Quantum")
+    QUANTUM_PLUGIN=$(cat /etc/nova/quantum_plugin.conf)
+    case $QUANTUM_PLUGIN in
+      "ovs")
+        SERVICES="$SERVICES quantum-plugin-openvswitch-agent"
+        QUANTUM_PLUGIN_CONF="/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini"
+        ;;
+      "nvp")
+        QUANTUM_PLUGIN_CONF="/etc/quantum/plugins/nicira/nvp.ini"
+        ;;
+       *)
+        juju-log "Unrecognised plugin for quantum: $QUANTUM_PLUGIN" && exit 1
+        ;;
+    esac
+    ;;
+  "FlatManager"|"FlatDHCPManager")
+    SERVICES="$SERVICES nova-api nova-network"
+    ;;
+esac
 
 if [[ -e $CHARM_DIR/lib/nova/nova-common ]] ; then
   . $CHARM_DIR/lib/nova/nova-common
@@ -59,10 +84,27 @@ function configure_network_manager {
   # needed by the nova-network bits
   # to be expanded later to cover flatDhcp and VLAN
   echo "$0: configuring $1 network manager"
-
+  local net_manager=$1
+  local quantum_plugin=$2
   local network_bridge=$(config-get bridge-interface)
+  local private_address=$(get_ip `unit-get private-address`)
+  # Check to ensure we can actually resolve
+  # the local unit IP address
+  [[ -n $private_address ]] || {
+    juju-log "Unable to resolve local IP address"
+    exit 1
+  }
 
-  case $1 in
+  # Store the network manager and quantum plugin
+  # for use in later hook invocations
+  [[ -n $net_manager ]] && echo $net_manager > /etc/nova/nm.conf
+  [[ -n $quantum_plugin ]] && echo $quantum_plugin > /etc/nova/quantum_plugin.conf
+
+  case $net_manager in
+    "FlatManager"|"FlatDHCPManager")
+      apt-get -y install nova-api nova-network
+      SERVICES="$SERVICES nova-api nova-network"
+      ;;
     "FlatManager")
       local bridge_ip=$(config-get bridge-ip)
       local bridge_netmask=$(config-get bridge-netmask)
@@ -81,6 +123,57 @@ function configure_network_manager {
       # address of API server to forward requests
       set_or_update ec2_dmz_host $ec2_host
       ;;
+    "Quantum")
+      local keystone_host=$(relation-get keystone_host)
+      [[ -z $keystone_host ]] && juju-log "nova-compute: Missing keystone host" \
+        && exit 0
+      set_or_update "network_api_class" "nova.network.quantumv2.api.API"
+      set_or_update "quantum_auth_strategy" "keystone"
+      set_or_update "quantum_url" "http://$(relation-get quantum_host):9696"
+      set_or_update "quantum_admin_tenant_name" "$(relation-get service_tenant)"
+      set_or_update "quantum_admin_username" "$(relation-get service_username)"
+      set_or_update "quantum_admin_password" "$(relation-get service_password)"
+      set_or_update "quantum_admin_auth_url" \
+                    "http://$(relation-get keystone_host):$(relation-get auth_port)/v2.0"
+      set_or_update "force_config_drive" "True"
+      case $quantum_plugin in
+        "ovs")
+          apt-get -y install openvswitch-datapath-dkms
+          apt-get -y install quantum-plugin-openvswitch-agent
+          local quantum_plugin_conf="/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini"
+          set_or_update "core_plugin" "quantum.plugins.openvswitch.ovs_quantum_plugin.OVSQuantumPluginV2" "$QUANTUM_CONF"
+          set_or_update "libvirt_vif_driver" "nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver"
+          set_or_update "libvirt_use_virtio_for_bridges" "True"
+          set_or_update "tenant_network_type" "gre" $quantum_plugin_conf "OVS"
+          set_or_update "enable_tunneling" "True" $quantum_plugin_conf "OVS"
+          set_or_update "tunnel_id_ranges" "1:1000" $quantum_plugin_conf "OVS"
+          set_or_update "local_ip" "$private_address" $quantum_plugin_conf "OVS"
+          SERVICES="$SERVICES quantum-plugin-openvswitch-agent"
+          ;;
+      esac
+      set_or_update "bind_host" "0.0.0.0" "$QUANTUM_CONF"
+      ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
+}
+
+BR_INT="br-int"
+
+function configure_quantum_bridge {
+  if ! ovs-vsctl show | grep -q "Bridge $BR_INT"; then
+    ovs-vsctl add-br $BR_INT
+  fi
+}
+
+function configure_libvirt {
+  cat > /etc/libvirt/qemu.conf << EOF
+# File installed by Juju nova-compute charm
+cgroup_device_acl = [
+   "/dev/null", "/dev/full", "/dev/zero",
+   "/dev/random", "/dev/urandom",
+   "/dev/ptmx", "/dev/kvm", "/dev/kqemu",
+   "/dev/rtc", "/dev/hpet", "/dev/net/tun",
+]
+EOF
+  service libvirt-bin reload
 }

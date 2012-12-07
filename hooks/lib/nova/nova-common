@@ -50,7 +50,22 @@ function configure_network_manager {
     "FlatDHCPManager")
       set_or_update "network_manager" "nova.network.manager.FlatDHCPManager"
       ;;
-    *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
+    "Quantum")
+      local local_ip=$(get_ip `unit-get private-address`)
+      [[ -n $local_ip ]] || juju-log "Unable to resolve local IP address" \
+        && exit 1
+      set_or_update "network_api_class" "nova.network.quantumv2.api.API"
+      set_or_update "quantum_auth_strategy" "keystone"
+      set_or_update "core_plugin" "$QUANTUM_CORE_PLUGIN" "$QUANTUM_CONF"
+      set_or_update "bind_host" "0.0.0.0" "$QUANTUM_CONF"
+      if [ "$QUANTUM_PLUGIN" == "ovs" ]; then
+          set_or_update "tenant_network_type" "gre" $QUANTUM_PLUGIN_CONF "OVS"
+          set_or_update "enable_tunneling" "True" $QUANTUM_PLUGIN_CONF "OVS"
+          set_or_update "tunnel_id_ranges" "1:1000" $QUANTUM_PLUGIN_CONF "OVS"
+          set_or_update "local_ip" "$local_ip" $QUANTUM_PLUGIN_CONF "OVS"
+      fi
+      ;;
+    *) juju-log "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
 }
 

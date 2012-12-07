@@ -17,6 +17,7 @@ function install_hook {
   apt-get -y install $compute_pkg $PACKAGES || exit 1
   service_ctl all stop
   set_or_update "auth_strategy" "keystone"
+  configure_libvirt
 }
 
 function config_changed() {
@@ -69,6 +70,14 @@ function amqp_changed {
   set_or_update rabbit_userid $rabbit_user
   set_or_update rabbit_password $rabbit_password
   set_or_update rabbit_virtual_host $rabbit_vhost
+
+  if [ "$NET_MANAGER" == "Quantum" ]; then
+    set_or_update rabbit_host "$rabbit_host" "$QUANTUM_CONF"
+    set_or_update rabbit_userid "$rabbit_user" "$QUANTUM_CONF"
+    set_or_update rabbit_password "$rabbit_password" "$QUANTUM_CONF"
+    set_or_update rabbit_virtual_host "$rabbit_vhost" "$QUANTUM_CONF"
+  fi
+
   service_ctl all restart
 }
 
@@ -80,12 +89,15 @@ function db_joined {
   local hostname=$(unit-get private-address)
   juju-log "$CHARM - db_joined: requesting database access to $nova_db for "\
            "$db_user@$hostname"
-  relation-set database=$nova_db username=$db_user hostname=$hostname
+  relation-set nova_database=$nova_db nova_username=$db_user nova_hostname=$hostname
+  if [ "$NET_MANAGER" == "Quantum" ]; then
+    relation-set quantum_database=quantum quantum_username=quantum quantum_hostname=$hostname
+  fi
 }
 
 function db_changed {
   local db_host=`relation-get private-address`
-  local db_password=`relation-get password`
+  local db_password=`relation-get nova_password`
 
   if [[ -z $db_host ]] || [[ -z $db_password ]] ; then
     juju-log "$CHARM - db_changed: db_host||db_password set, will retry."
@@ -97,6 +109,13 @@ function db_changed {
   juju-log "$CHARM - db_changed: Configuring nova.conf for access to $nova_db"
 
   set_or_update sql_connection "mysql://$db_user:$db_password@$db_host/$nova_db"
+
+  if [ "$NET_MANAGER" == "Quantum" ]; then
+    local quantum_db_password=`relation-get quantum_password`
+    set_or_update sql_connection "mysql://quantum:$quantum_db_password@$db_host/quantum?charset=utf8" \
+      $QUANTUM_PLUGIN_CONF "DATABASE"
+  fi
+
   service_ctl all restart
 }
 
@@ -115,7 +134,39 @@ function compute_changed {
   # needs to configure itself accordingly.
   network_manager=`relation-get network_manager`
   if [[ -n "$network_manager" ]] ; then
-    configure_network_manager "$network_manager"
+    if [ "$network_manager" == "Quantum" ]; then
+      configure_network_manager "$network_manager" "$(relation-get quantum_plugin)"
+      configure_quantum_bridge
+      # Quantum also needs access to the quantum database
+      # depending on add-relation order, this relation
+      # may already be present so ask it for credentials if so
+      r_ids="$(relation-ids shared-db)"
+      for id in $r_ids ; do
+        relation-set -r $id \
+          quantum_database=quantum \
+          quantum_username=quantum \
+          quantum_hostname=$(unit-get private-address)
+      done
+      # Rabbit MQ relation may also already be in place
+      # shared vhost with nova so just grab settings and
+      # configure
+      r_ids="$(relation-ids amqp)"
+      for id in $r_ids ; do
+        for unit in $(relation-list -r $id) ; do
+          local rabbit_host=$(relation-get -r $id private-address $unit)
+          local rabbit_password=$(relation-get -r $id password $unit)
+          if [[ -n $rabbit_host ]] && \
+             [[ -n $rabbit_password ]]; then
+            set_or_update rabbit_host "$rabbit_host" "$QUANTUM_CONF"
+            set_or_update rabbit_userid "$(config-get rabbit-user)" "$QUANTUM_CONF"
+            set_or_update rabbit_password "$rabbit_password" "$QUANTUM_CONF"
+            set_or_update rabbit_virtual_host "$(config-get rabbit-vhost)" "$QUANTUM_CONF"
+          fi
+        done
+      done
+    else
+      configure_network_manager "$network_manager"
+    fi
   fi
 
   # nova-c-c informs us of what volume service has been deployed.
