@@ -198,6 +198,12 @@ EOF
       set_or_update "listen_tls" 0 $LIBVIRTD_CONF
       set_or_update "auth_tcp" "\"none\"" $LIBVIRTD_CONF
     fi
+  else
+    set_or_update "listen_tcp" 0 $LIBVIRTD_CONF
+    local cur_opts=$(grep "^libvirtd_opts" /etc/default/libvirt-bin |
+                     cut -d= -f2 |  sed -e 's/\"//g')
+    local new_opts=$(echo $cur_opts | sed -e 's/\-l//g')
+    sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
   fi
 
   service libvirt-bin restart
