@@ -7,6 +7,7 @@ CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
 QUANTUM_CONF="/etc/quantum/quantum.conf"
+LIBVIRTD_CONF="/etc/libvirt/libvirtd.conf"
 
 if [ -f /etc/nova/nm.conf ]; then
     NET_MANAGER=$(cat /etc/nova/nm.conf)
@@ -175,5 +176,29 @@ cgroup_device_acl = [
    "/dev/rtc", "/dev/hpet", "/dev/net/tun",
 ]
 EOF
-  service libvirt-bin reload
+
+  local enable_migration=$(config-get enable-live-migration)
+  if [[ "$enable_migration" == "True" ]] ||
+     [[ "$enable_migration" == "true" ]] ; then
+    # set appropriate option in /etc/default/libvirt-bin to allow
+    # listening on tcp
+    local cur_opts=$(grep "^libvirtd_opts" /etc/default/libvirt-bin |
+                     cut -d= -f2 |  sed -e 's/\"//g')
+    local new_opts=""
+    if [[ -z "$cur_opts" ]] ; then
+      new_opts="-d -l"
+      echo "libvirtd_opts=\"-d -l\"" >>/etc/default/libvirt-bin
+    elif ! echo "$cur_opts" | grep -q "\-l" ; then
+      new_opts="$cur_opts -l"
+      sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
+    fi
+
+    set_or_update "listen_tcp" 1 $LIBVIRTD_CONF
+    if [[ "$(config-get migration-auth-type)" == "none" ]] ; then
+      set_or_update "listen_tls" 0 $LIBVIRTD_CONF
+      set_or_update "auth_tcp" "\"none\"" $LIBVIRTD_CONF
+    fi
+  fi
+
+  service libvirt-bin restart
 }

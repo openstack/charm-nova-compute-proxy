@@ -37,7 +37,17 @@ options:
   virt-type:
     default: kvm
     type: string
-    description: "Virtualization flavor. Supported: kvm, xen, uml, lxc. qemu"
+    description: Virtualization flavor (kvm, xen, uml, lxc, qemu)
+  enable-live-migration:
+    default: False
+    type: boolean
+    description: Configure libvirt for live migration.
+  migration-auth-type:
+    default: sasl
+    type: string
+    description: |
+      TCP authentication scheme for libvirt live migration.  Available options
+      include sasl or none.
   # needed if using flatmanager
   bridge-interface:
     default: br100

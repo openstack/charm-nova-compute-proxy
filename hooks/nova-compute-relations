@@ -34,7 +34,7 @@ function config_changed() {
     juju-log "$CHARM: Upgrading OpenStack release: $cur -> $available."
     do_openstack_upgrade "$install_src" $PACKAGES
   fi
-
+  configure_libvirt
   set_config_flags
   service_ctl all restart
 }
