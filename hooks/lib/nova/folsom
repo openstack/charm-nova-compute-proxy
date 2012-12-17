@@ -15,7 +15,7 @@ nova_set_or_update() {
   local quantum_conf=${QUANTUM_CONF:-/etc/quantum/quantum.conf}
   local quantum_api_conf=${QUANTUM_API_CONF:-/etc/quantum/api-paste.ini}
   local quantum_plugin_conf=${QUANTUM_PLUGIN_CONF:-/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini}
-  local libvirtd_conf={$LIBVIRTD_CONF:-/etc/libvirt/libvirtd.conf}
+  local libvirtd_conf=${LIBVIRTD_CONF:-/etc/libvirt/libvirtd.conf}
 
   [[ -z $key ]] && juju-log "$CHARM: set_or_update: value $value missing key" && exit 1
   [[ -z $value ]] && juju-log "$CHARM: set_or_update: key $key missing value" && exit 1
