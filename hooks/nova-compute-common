@@ -105,7 +105,7 @@ function configure_network_manager {
     "FlatManager"|"FlatDHCPManager")
       apt-get -y install nova-api nova-network
       SERVICES="$SERVICES nova-api nova-network"
-      ;;
+      ;;&
     "FlatManager")
       local bridge_ip=$(config-get bridge-ip)
       local bridge_netmask=$(config-get bridge-netmask)
