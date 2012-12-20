@@ -257,7 +257,7 @@ function ssh_peer {
       # can't get to relation state anymore for entire public key.
       # authorized_keys() will remove based on comment, which is based
       # on unit name.
-      local remote_unit=$(echo $JUJU_REMOVE_UNIT | sed -e 's,/,-,g')
+      local remote_unit=$(echo $JUJU_REMOTE_UNIT | sed -e 's,/,-,g')
       authorized_keys "$remote_unit" remove
       ;;
   esac
