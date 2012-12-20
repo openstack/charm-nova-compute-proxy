@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 CHARM="nova-compute"
-PACKAGES="nova-compute python-keystone genisoimage"
+PACKAGES="nova-compute python-keystone genisoimage uuid"
 SERVICES="nova-compute"
 CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)

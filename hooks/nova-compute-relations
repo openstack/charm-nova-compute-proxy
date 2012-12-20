@@ -246,7 +246,10 @@ function ssh_peer {
   juju-log "$CHARM: A SSH peer has $hook."
   case "$hook" in
     "joined")
-      relation-set $relid ssh_public_key="$(cat /root/.ssh/id_rsa.pub)" ;;
+      relation-set $relid ssh_public_key="$(cat /root/.ssh/id_rsa.pub)"
+      # ensure changed hooks fire.
+      relation-set $relid trigger=$(trigger)
+      ;;
     "changed")
       local remote_key="$(relation-get ssh_public_key)"
       [[ -z "$remote_key" ]] && juju-log "$CHARM: ssh peer not ready." &&
