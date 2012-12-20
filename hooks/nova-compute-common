@@ -50,7 +50,7 @@ determine_compute_package() {
     "xen") compute_pkg="nova-compute-xen";;
     "uml") compute_pkg="nova-compute-uml";;
     "lxc") compute_pkg="nova-compute-lxc";;
-    *) error_out" ERROR: Unsupported virt_type=$virt_type";;
+    *) error_out "ERROR: Unsupported virt_type=$virt_type";;
   esac
   echo "$compute_pkg"
 }
@@ -166,6 +166,122 @@ function configure_quantum_bridge {
   fi
 }
 
+function initialize_ssh_keys {
+  # generate ssh keypair for root if one does not exist or
+  # the pari is not complete.
+  local pub="/root/.ssh/id_rsa"
+  local priv="/root/.ssh/id_rsa.pub"
+  if [[ -e $pub ]] &&
+     [[ -e $priv ]] ; then
+    juju-log "$CHARM: SSH credentials already exist for root."
+    return 0
+  fi
+  juju-log "$CHARM: Initializing new SSH key pair for live migration."
+  [[ -e $pub ]] && mv $pub $pub.$(date +"%s")
+  [[ -e $priv ]] && mv $priv $priv.$(date +"%s")
+  local keyname=$(echo $JUJU_UNIT_NAME | sed -e 's,/,-,g')
+  echo -e "\n" | ssh-keygen -C "$keyname" -N ""
+}
+
+function authorized_keys {
+  local key="$1"
+  local action="$2"
+  local exists=""
+  local authorized_keys="/root/.ssh/authorized_keys"
+
+  [[ -e "$authorized_keys" ]] &&
+    grep -q "^$key" $authorized_keys && exists="true"
+
+  if [[ "$action" == "add" ]] ; then
+    [[ -n "$exists" ]] &&
+      juju-log "$CHARM: SSH key already authorized for $JUJU_REMOTE_UNIT." &&
+        return 0
+
+    echo "$key" >>$authorized_keys
+    juju-log "$CHARM: Authorized new SSH key for $JUJU_REMOTE_UNIT."
+    return 0
+  elif [[ "$action" == "remove" ]] ; then
+    # we have no way of getting to the relation state during a departed hook.
+    # we only have the peer's unit name, so remove an authorized key based on
+    # its comment, which should can be derived from the remote unit name and
+    # gets passed in here from caller as key/$1
+    local key_ln=$(sed -n "\, ${key}$,=" $authorized_keys)
+    [[ -z "$key_ln" ]] &&
+      juju-log "$CHARM: Cannot remove SSH key for $key, not authorized?" &&
+        return 0
+
+    for ln in $key_ln ; do
+      sed -i "${ln}d" $authorized_keys
+      juju-log "$CHARM: Removed existing SSH key ($key) from authorized_keys."
+    done
+    return 0
+  else
+    error_out "$CHARM: authorize_keys() invalid action specified: $action."
+  fi
+}
+
+function libvirt_tcp_listening {
+  # toggle libvirtd's tcp listening in both /etc/default/libvirt-bin
+  # and /etc/libvirt/libvirtd.conf.
+  local toggle="$1"
+  juju-log "$CHARM: Configuring libvirt tcp listening: $toggle."
+  local cur_opts=$(grep "^libvirtd_opts" /etc/default/libvirt-bin |
+                   cut -d= -f2 |  sed -e 's/\"//g')
+  local new_opts=""
+
+  if [[ "$toggle" == "on" ]] ; then
+    if [[ -z "$cur_opts" ]] ; then
+      echo "libvirtd_opts=\"-d -l\"" >>/etc/default/libvirt-bin
+    elif ! echo "$cur_opts" | grep -q "\-l" ; then
+      new_opts="$cur_opts -l"
+      sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
+    fi
+    set_or_update "listen_tcp" 1 $LIBVIRTD_CONF
+  elif [[ "$toggle" == "off" ]] ; then
+    if echo "$cur_opts" | grep -q "\-l" ; then
+      new_opts=$(echo $cur_opts | sed -e 's/\-l//g')
+    fi
+    set_or_update "listen_tcp" 0  $LIBVIRTD_CONF
+  fi
+
+  [[ -n "$new_opts" ]] &&
+    sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
+
+  return 0
+}
+
+
+function configure_migration {
+  local enable_migration=$(config-get enable-live-migration)
+
+  if [[ "$enable_migration" != "True" ]] &&
+     [[ "$enable_migraiton" != "true" ]] ; then
+     libvirt_tcp_listening "off"
+     return $?
+  fi
+
+  libvirt_tcp_listening "on"
+
+  case "$(config-get migration-auth-type)" in
+    "none"|"None"|"ssh")
+      set_or_update "listen_tls" 0 $LIBVIRTD_CONF
+      set_or_update "auth_tcp" "\"none\"" $LIBVIRTD_CONF
+      ;;&
+    "ssh")
+      set_or_update "live_migration_uri" "qemu+ssh://%s/system" $NOVA_CONF
+      initialize_ssh_keys
+      service_ctl nova-compute restart ;;
+    "sasl") return 0 ;;
+  esac
+
+  # Trigger on peer relations to allow all peers negotiate authentication
+  # among themselves.
+  relids="$(relation-ids compute-peer)"
+  for id in $relids ; do
+    compute_peer "joined" "$id"
+  done
+}
+
 function configure_libvirt {
   cat > /etc/libvirt/qemu.conf << EOF
 # File installed by Juju nova-compute charm
@@ -176,35 +292,6 @@ cgroup_device_acl = [
    "/dev/rtc", "/dev/hpet", "/dev/net/tun",
 ]
 EOF
-
-  local enable_migration=$(config-get enable-live-migration)
-  if [[ "$enable_migration" == "True" ]] ||
-     [[ "$enable_migration" == "true" ]] ; then
-    # set appropriate option in /etc/default/libvirt-bin to allow
-    # listening on tcp
-    local cur_opts=$(grep "^libvirtd_opts" /etc/default/libvirt-bin |
-                     cut -d= -f2 |  sed -e 's/\"//g')
-    local new_opts=""
-    if [[ -z "$cur_opts" ]] ; then
-      new_opts="-d -l"
-      echo "libvirtd_opts=\"-d -l\"" >>/etc/default/libvirt-bin
-    elif ! echo "$cur_opts" | grep -q "\-l" ; then
-      new_opts="$cur_opts -l"
-      sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
-    fi
-
-    set_or_update "listen_tcp" 1 $LIBVIRTD_CONF
-    if [[ "$(config-get migration-auth-type)" == "none" ]] ; then
-      set_or_update "listen_tls" 0 $LIBVIRTD_CONF
-      set_or_update "auth_tcp" "\"none\"" $LIBVIRTD_CONF
-    fi
-  else
-    set_or_update "listen_tcp" 0 $LIBVIRTD_CONF
-    local cur_opts=$(grep "^libvirtd_opts" /etc/default/libvirt-bin |
-                     cut -d= -f2 |  sed -e 's/\"//g')
-    local new_opts=$(echo $cur_opts | sed -e 's/\-l//g')
-    sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
-  fi
-
+  configure_migration
   service libvirt-bin restart
 }

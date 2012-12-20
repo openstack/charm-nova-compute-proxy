@@ -232,6 +232,48 @@ EOF
   fi
 }
 
+function migration_enabled {
+  local migration="$(config-get enable-live-migration)"
+  [[ "$migration" == "true" ]] || [[ "$migration" == "True" ]] && return 0
+  return 1
+}
+
+function ssh_peer {
+  local hook="$1"
+  local relid="$2"
+  [[ -n "$relid" ]] && relid="-r $relid"
+  # handles peer relations for ssh live migration.
+  juju-log "$CHARM: A SSH peer has $hook."
+  case "$hook" in
+    "joined")
+      relation-set $relid ssh_public_key="$(cat /root/.ssh/id_rsa.pub)" ;;
+    "changed")
+      local remote_key="$(relation-get ssh_public_key)"
+      [[ -z "$remote_key" ]] && juju-log "$CHARM: ssh peer not ready." &&
+        exit 0
+      authorized_keys "$remote_key" add
+      ;;
+    "departed")
+      # can't get to relation state anymore for entire public key.
+      # authorized_keys() will remove based on comment, which is based
+      # on unit name.
+      local remote_unit=$(echo $JUJU_REMOVE_UNIT | sed -e 's,/,-,g')
+      authorized_keys "$remote_unit" remove
+      ;;
+  esac
+}
+
+function compute_peer {
+  local hook="$1"
+  local relid="$2"
+  migration_enabled || return 0
+  case "$(config-get migration-auth-type)" in
+    "ssh") ssh_peer "$hook" "$relid" ;;
+    "sasl") return 0 ;;
+    "none"|*) return 0 ;;
+  esac
+}
+
 case $ARG0 in
   "install") install_hook ;;
   "start"|"stop") exit 0 ;;
@@ -248,4 +290,7 @@ case $ARG0 in
   "ceph-relation-changed") ceph_changed;;
   "cloud-compute-relation-joined" ) exit 0 ;;
   "cloud-compute-relation-changed") compute_changed ;;
+  "compute-peer-relation-joined") compute_peer "joined" ;;
+  "compute-peer-relation-changed") compute_peer "changed" ;;
+  "compute-peer-relation-departed") compute_peer "departed" ;;
 esac
