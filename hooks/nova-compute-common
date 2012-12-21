@@ -252,3 +252,9 @@ EOF
   configure_migration
   service libvirt-bin restart
 }
+
+function migration_enabled {
+  local migration="$(config-get enable-live-migration)"
+  [[ "$migration" == "true" ]] || [[ "$migration" == "True" ]] && return 0
+  return 1
+}
