@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 CHARM="nova-compute"
-PACKAGES="nova-compute python-keystone genisoimage uuid"
+PACKAGES="nova-compute python-keystone genisoimage uuid charm-helper-sh"
 SERVICES="nova-compute"
 CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
@@ -183,7 +183,7 @@ function initialize_ssh_keys {
   echo -e "\n" | ssh-keygen -C "$keyname" -N ""
 }
 
-function authorized_keys {
+function ssh_authorized_keys {
   local key="$1"
   local action="$2"
   local exists=""
@@ -216,8 +216,39 @@ function authorized_keys {
     done
     return 0
   else
-    error_out "$CHARM: authorize_keys() invalid action specified: $action."
+    error_out "$CHARM: ssh_authorize_keys() invalid action specified: $action."
   fi
+}
+
+function ssh_known_hosts {
+  # Keeps the system-wide SSH known hosts file up to date with compute
+  # nodes host keys.
+  local host="$1"
+  local known_hosts="/etc/ssh/ssh_known_hosts"
+  juju-log "$CHARM: Ensuring host is included and up to date in $known_hosts."
+
+  [[ ! -e $known_hosts ]] && touch $known_hosts
+
+  local remote_key=""
+  remote_key=$(ssh-keyscan -H -t rsa $host) ||
+    error_out "$CHARM: Couldn't obtain SSH host key from $host."
+  local existing=$(ssh-keygen -f $known_hosts -H -F $host | tail -n1)
+  if [[ -n "$existing" ]] ; then
+    juju-log "$CHARM: Found existing SSH known host key for $host."
+    [[ "$existing" == "$remote_key" ]] && echo "HI"
+    remote=$(echo $remote_key | awk '{ print $2" "$3 }')
+    existing=$(echo $existing | awk '{ print $2" "$3 }')
+    if [[ "$remote" == "$existing" ]] ; then
+      juju-log "$CHARM: SSH known host key for $host is up to date."
+      return 0
+    fi
+    juju-log "$CHARM: Removing outdated SSH host key for $host."
+    ssh-keygen -f $known_hosts -R $host
+  else
+    juju-log "$CHARM: No known hosts entry for $host."
+  fi
+  juju-log "$CHARM: Adding new SSH known hosts entry for $host."
+  echo $remote_key >>$known_hosts
 }
 
 function libvirt_tcp_listening {
@@ -263,11 +294,12 @@ function configure_migration {
   libvirt_tcp_listening "on"
 
   case "$(config-get migration-auth-type)" in
-    "none"|"None"|"ssh")
+    "none"|"None")
       set_or_update "listen_tls" 0 $LIBVIRTD_CONF
       set_or_update "auth_tcp" "\"none\"" $LIBVIRTD_CONF
-      ;;&
+      ;;
     "ssh")
+      set_or_update "listen_tls" 0 $LIBVIRTD_CONF
       set_or_update "live_migration_uri" "qemu+ssh://%s/system" $NOVA_CONF
       initialize_ssh_keys
       service_ctl nova-compute restart ;;
@@ -275,8 +307,9 @@ function configure_migration {
   esac
 
   # Trigger on peer relations to allow all peers negotiate authentication
-  # among themselves.
+  # among themselves  (if we are not the only peer).
   relids="$(relation-ids compute-peer)"
+  [[ "$(echo "$relids" | wc -l)" == 1 ]] && return 0
   for id in $relids ; do
     compute_peer "joined" "$id"
   done

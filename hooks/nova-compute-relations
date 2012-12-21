@@ -248,20 +248,34 @@ function ssh_peer {
     "joined")
       relation-set $relid ssh_public_key="$(cat /root/.ssh/id_rsa.pub)"
       # ensure changed hooks fire.
-      relation-set $relid trigger=$(trigger)
+      relation-set $relid
       ;;
     "changed")
       local remote_key="$(relation-get ssh_public_key)"
       [[ -z "$remote_key" ]] && juju-log "$CHARM: ssh peer not ready." &&
         exit 0
-      authorized_keys "$remote_key" add
+
+      ssh_authorized_keys "$remote_key" add
+
+      # need to ensure known hosts entries for all possible addresses
+      . /usr/share/charm-helper/sh/net.sh
+      local known_hosts=""
+      local private_address=$(relation-get private-address)
+      known_hosts="$private_address"
+      if ! ch_is_ip "$private_address" ; then
+        known_hosts="$known_hosts $(get_ip $private_address)"
+        known_hosts="$known_hosts $(echo $private_address | cut -d. -f1)"
+      fi
+      for host in $known_hosts ; do
+        ssh_known_hosts "$host"
+      done
       ;;
     "departed")
       # can't get to relation state anymore for entire public key.
-      # authorized_keys() will remove based on comment, which is based
+      # ssh_authorized_keys() will remove based on comment, which is based
       # on unit name.
       local remote_unit=$(echo $JUJU_REMOTE_UNIT | sed -e 's,/,-,g')
-      authorized_keys "$remote_unit" remove
+      ssh_authorized_keys "$remote_unit" remove
       ;;
   esac
 }
