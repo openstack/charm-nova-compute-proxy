@@ -183,74 +183,6 @@ function initialize_ssh_keys {
   echo -e "\n" | ssh-keygen -C "$keyname" -N ""
 }
 
-function ssh_authorized_keys {
-  local key="$1"
-  local action="$2"
-  local exists=""
-  local authorized_keys="/root/.ssh/authorized_keys"
-
-  [[ -e "$authorized_keys" ]] &&
-    grep -q "^$key" $authorized_keys && exists="true"
-
-  if [[ "$action" == "add" ]] ; then
-    [[ -n "$exists" ]] &&
-      juju-log "$CHARM: SSH key already authorized for $JUJU_REMOTE_UNIT." &&
-        return 0
-
-    echo "$key" >>$authorized_keys
-    juju-log "$CHARM: Authorized new SSH key for $JUJU_REMOTE_UNIT."
-    return 0
-  elif [[ "$action" == "remove" ]] ; then
-    # we have no way of getting to the relation state during a departed hook.
-    # we only have the peer's unit name, so remove an authorized key based on
-    # its comment, which should can be derived from the remote unit name and
-    # gets passed in here from caller as key/$1
-    local key_ln=$(sed -n "\, ${key}$,=" $authorized_keys)
-    [[ -z "$key_ln" ]] &&
-      juju-log "$CHARM: Cannot remove SSH key for $key, not authorized?" &&
-        return 0
-
-    for ln in $key_ln ; do
-      sed -i "${ln}d" $authorized_keys
-      juju-log "$CHARM: Removed existing SSH key ($key) from authorized_keys."
-    done
-    return 0
-  else
-    error_out "$CHARM: ssh_authorize_keys() invalid action specified: $action."
-  fi
-}
-
-function ssh_known_hosts {
-  # Keeps the system-wide SSH known hosts file up to date with compute
-  # nodes host keys.
-  local host="$1"
-  local known_hosts="/etc/ssh/ssh_known_hosts"
-  juju-log "$CHARM: Ensuring host is included and up to date in $known_hosts."
-
-  [[ ! -e $known_hosts ]] && touch $known_hosts
-
-  local remote_key=""
-  remote_key=$(ssh-keyscan -H -t rsa $host) ||
-    error_out "$CHARM: Couldn't obtain SSH host key from $host."
-  local existing=$(ssh-keygen -f $known_hosts -H -F $host | tail -n1)
-  if [[ -n "$existing" ]] ; then
-    juju-log "$CHARM: Found existing SSH known host key for $host."
-    [[ "$existing" == "$remote_key" ]] && echo "HI"
-    remote=$(echo $remote_key | awk '{ print $2" "$3 }')
-    existing=$(echo $existing | awk '{ print $2" "$3 }')
-    if [[ "$remote" == "$existing" ]] ; then
-      juju-log "$CHARM: SSH known host key for $host is up to date."
-      return 0
-    fi
-    juju-log "$CHARM: Removing outdated SSH host key for $host."
-    ssh-keygen -f $known_hosts -R $host
-  else
-    juju-log "$CHARM: No known hosts entry for $host."
-  fi
-  juju-log "$CHARM: Adding new SSH known hosts entry for $host."
-  echo $remote_key >>$known_hosts
-}
-
 function libvirt_tcp_listening {
   # toggle libvirtd's tcp listening in both /etc/default/libvirt-bin
   # and /etc/libvirt/libvirtd.conf.
@@ -305,14 +237,6 @@ function configure_migration {
       service_ctl nova-compute restart ;;
     "sasl") return 0 ;;
   esac
-
-  # Trigger on peer relations to allow all peers negotiate authentication
-  # among themselves  (if we are not the only peer).
-  relids="$(relation-ids compute-peer)"
-  [[ "$(echo "$relids" | wc -l)" == 1 ]] && return 0
-  for id in $relids ; do
-    compute_peer "joined" "$id"
-  done
 }
 
 function configure_libvirt {
