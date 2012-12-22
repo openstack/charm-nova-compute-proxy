@@ -234,6 +234,10 @@ function configure_migration {
       set_or_update "listen_tls" 0 $LIBVIRTD_CONF
       set_or_update "live_migration_uri" "qemu+ssh://%s/system" $NOVA_CONF
       initialize_ssh_keys
+      # check in with nova-c-c and register our new key.
+      for id in $(relation-ids cloud-compute) ; do
+        compute_joined $id
+      done
       service_ctl nova-compute restart ;;
     "sasl") return 0 ;;
   esac
