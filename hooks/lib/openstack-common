@@ -94,9 +94,9 @@ function configure_install_source {
       error_out "Cannot install from Cloud Archive pocket $src " \
                 "on this Ubuntu version ($DISTRIB_CODENAME)!"
 
-    if [[ "$ca_rel" == "folsom/staging" ]] ; then
-      # cloud archive staging is just a regular PPA.
-      add-apt-repository -y ppa:ubuntu-cloud-archive/folsom-staging
+    if echo $ca_rel | grep -q "staging" ; then
+      ca_rel=$(echo $ca_rel | sed -e 's,/,-,g')
+      add-apt-repository -y ppa:ubuntu-cloud-archive/$ca_rel
       return 0
     fi
 
@@ -142,8 +142,8 @@ get_os_codename_install_source() {
       case "$ca_rel" in
         "folsom"|"folsom/updates"|"folsom/proposed"|"folsom/staging")
           codename="folsom" ;;
-        "grizzly"|"grizzly/updates"|"grizzly/proposed"|"grizzy/staging")
-          codename="grizly" ;;
+        "grizzly"|"grizzly/updates"|"grizzly/proposed"|"grizzly/staging")
+          codename="grizzly" ;;
       esac
     fi
   fi
@@ -161,7 +161,7 @@ get_os_codename_install_source() {
 }
 
 get_os_codename_package() {
-  local pkg_vers=$(dpkg -l | grep "$1" | awk '{ print $3 }')
+  local pkg_vers=$(dpkg -l | grep "$1" | awk '{ print $3 }') || echo "none"
   case "${pkg_vers:0:6}" in
     "2011.2") echo "diablo" ;;
     "2012.1") echo "essex" ;;
