@@ -55,6 +55,25 @@ function configure_network_manager {
       ;;
     "FlatDHCPManager")
       set_or_update "network_manager" "nova.network.manager.FlatDHCPManager"
+
+      if [[ "$CHARM" == "nova-compute" ]] ; then
+        local flat_interface=$(config-get flat-interface)
+        local ec2_host=$(relation-get ec2_host)
+        set_or_update flat_inteface "$flat_interface"
+        set_or_update ec2_dmz_host "$ec2_host"
+
+        # Ensure flat_interface has link.
+        if ip link show $flat_interface >/dev/null 2>&1 ; then
+          ip link set $flat_interface up
+        fi
+
+        # work around (LP: #1035172)
+        if [[ -e /dev/vhost-net ]] ; then
+          iptables -A POSTROUTING -t mangle -p udp --dport 68 -j CHECKSUM \
+            --checksum-fill
+        fi
+      fi
+
       ;;
     "Quantum")
       local local_ip=$(get_ip `unit-get private-address`)
