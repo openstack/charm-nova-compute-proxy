@@ -193,13 +193,13 @@ function compute_changed {
   if migration_enabled ; then
     case "$(config-get migration-auth-type)" in
       "ssh")
-          local known_hosts_url="$(relation-get known_hosts_url)"
-          local authorized_keys_url="$(relation-get authorized_keys_url)"
-          if [[ -n "$known_hosts_url" ]] &&
-             [[ -n "$authorized_keys_url" ]] ; then
-            juju-log "$CHARM: wget'ing new known_hosts/authorized_keys."
-            wget --quiet -O /root/.ssh/known_hosts "$known_hosts_url"
-            wget --quiet -O /root/.ssh/authorized_keys "$authorized_keys_url"
+          local known_hosts="$(relation-get known_hosts)"
+          local authorized_keys="$(relation-get authorized_keys)"
+          if [[ -n "$known_hosts" ]] &&
+             [[ -n "$authorized_keys" ]] ; then
+            juju-log "$CHARM: Saving new known_hosts+authorized_keys file."
+            echo "$known_hosts" | base64 -di >/root/.ssh/known_hosts
+            echo "$authorized_keys" | base64 -di >/root/.ssh/authorized_keys
           fi
           ;;
     esac
