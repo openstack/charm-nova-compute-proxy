@@ -314,3 +314,106 @@ function get_block_device() {
   echo "$found"
   return 0
 }
+
+HAPROXY_CFG=/etc/haproxy/haproxy.cfg
+HAPROXY_DEFAULT=/etc/default/haproxy
+
+##########################################################################
+# Description: Configures HAProxy services for Openstack API's
+# Parameters: 
+#   Space delimited list of service:port combinations for which
+#   haproxy service configuration should be generated for.  The function
+#   assumes the name of the peer relation is 'cluster' and that every
+#   service unit in the peer relation is running the same services.
+#
+#   The HAProxy service will listen on port + 10000.
+# Example:
+#   configure_haproxy cinder_api:12345 nova_api:9999 
+##########################################################################
+configure_haproxy() {
+  local address=`unit-get private-address`
+  local name=${JUJU_UNIT_NAME////-}
+  cat > $HAPROXY_CFG << EOF
+global
+  log 127.0.0.1 local0
+  log 127.0.0.1 local1 notice
+  maxconn 4096
+  user haproxy
+  group haproxy
+  spread-checks 0
+
+defaults
+  log global
+  mode http
+  option httplog
+  option dontlognull
+  retries 3
+  timeout queue 1000
+  timeout connect 1000
+  timeout client 1000
+  timeout server 1000
+
+listen stats :8888
+  mode http
+  stats enable
+  stats hide-version
+  stats realm Haproxy\ Statistics
+  stats uri /
+  stats auth admin:password
+
+EOF
+  for service in $@; do
+    local service_name=$(echo $service | cut -d : -f 1)
+    local api_listen_port=$(echo $service | cut -d : -f 2)
+    local haproxy_listen_port=$(($api_listen_port + 10000))
+    cat >> $HAPROXY_CFG << EOF
+listen $service_name 0.0.0.0:$haproxy_listen_port
+  balance roundrobin
+  option tcplog
+  server $name $address:$api_listen_port check
+EOF
+    for r_id in `relation-ids cluster`; do
+      for unit in `relation-list -r $r_id`; do
+        local unit_name=${unit////-}
+        local unit_address=`relation-get -r $r_id private-address $unit`
+        if [ -n "$unit_address" ]; then
+          echo "  server $unit_name $unit_address:$api_listen_port check" \
+            >> $HAPROXY_CFG
+        fi
+      done
+    done
+  done
+  echo "ENABLED=1" > $HAPROXY_DEFAULT
+}
+
+##########################################################################
+# Description: Query HA interface to determine is cluster is configured
+# Returns: 0 if configured, 1 if not configured
+##########################################################################
+is_clustered() {
+  for r_id in `relation-ids ha`; do
+    for unit in `relation-list -r $r_id`; do
+       clustered=`relation-get -r $r_id clustered $unit`
+       if [ -n "$clustered" ]; then
+         return 0
+       fi
+    done
+  done
+  return 1
+}
+
+##########################################################################
+# Description: Determines whether host is owner of clustered services
+# Parameters: Name of CRM resource to check ownership of
+# Returns: 0 if leader, 1 if not leader
+##########################################################################
+is_leader() {
+  hostname=`hostname`
+  if [ -x /usr/sbin/crm ]; then
+    if crm resource show $1 | grep -q $hostname; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
