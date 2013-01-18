@@ -62,6 +62,18 @@ function amqp_changed {
       exit 0
   fi
 
+  # if the rabbitmq service is clustered among nodes with hacluster,
+  # point to its vip instead of its private-address.
+  local clustered=$(relation-get clustered)
+  if [[ -n "$clustered" ]] ; then
+    juju-log "$CHARM - ampq_changed: Configuring for "\
+             "access to haclustered rabbitmq service."
+    local vip=$(relation-get vip)
+    [[ -z "$vip" ]] && juju-log "$CHARM - amqp_changed: Clustered but no vip."\
+      && exit 0
+    rabbit_host="$vip"
+  fi
+
   local rabbit_user=$(config-get rabbit-user)
   local rabbit_vhost=$(config-get rabbit-vhost)
   juju-log "$CHARM - amqp_changed: Setting rabbit config in nova.conf: " \
