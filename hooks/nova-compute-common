@@ -7,6 +7,7 @@ CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
 QUANTUM_CONF="/etc/quantum/quantum.conf"
+LIBVIRTD_CONF="/etc/libvirt/libvirtd.conf"
 
 if [ -f /etc/nova/nm.conf ]; then
     NET_MANAGER=$(cat /etc/nova/nm.conf)
@@ -49,7 +50,7 @@ determine_compute_package() {
     "xen") compute_pkg="nova-compute-xen";;
     "uml") compute_pkg="nova-compute-uml";;
     "lxc") compute_pkg="nova-compute-lxc";;
-    *) error_out" ERROR: Unsupported virt_type=$virt_type";;
+    *) error_out "ERROR: Unsupported virt_type=$virt_type";;
   esac
   echo "$compute_pkg"
 }
@@ -135,7 +136,14 @@ function configure_network_manager {
       set_or_update "quantum_admin_password" "$(relation-get service_password)"
       set_or_update "quantum_admin_auth_url" \
                     "http://$(relation-get keystone_host):$(relation-get auth_port)/v2.0"
-      set_or_update "force_config_drive" "True"
+      local cur=$(get_os_codename_package "nova-common")
+      if dpkg --compare-versions $(get_os_version_codename $cur) gt '2012.2'; then
+        # Grizzly onwards supports metadata proxy so forcing use of config
+        # drive is not required.
+        set_or_update "force_config_drive" "False"
+      else
+        set_or_update "force_config_drive" "True"
+      fi
       case $quantum_plugin in
         "ovs")
           apt-get -y install openvswitch-datapath-dkms
@@ -165,6 +173,83 @@ function configure_quantum_bridge {
   fi
 }
 
+function initialize_ssh_keys {
+  # generate ssh keypair for root if one does not exist or
+  # the pari is not complete.
+  local pub="/root/.ssh/id_rsa"
+  local priv="/root/.ssh/id_rsa.pub"
+  if [[ -e $pub ]] &&
+     [[ -e $priv ]] ; then
+    juju-log "$CHARM: SSH credentials already exist for root."
+    return 0
+  fi
+  juju-log "$CHARM: Initializing new SSH key pair for live migration."
+  [[ -e $pub ]] && mv $pub $pub.$(date +"%s")
+  [[ -e $priv ]] && mv $priv $priv.$(date +"%s")
+  local keyname=$(echo $JUJU_UNIT_NAME | sed -e 's,/,-,g')
+  echo -e "\n" | ssh-keygen -C "$keyname" -N ""
+}
+
+function libvirt_tcp_listening {
+  # toggle libvirtd's tcp listening in both /etc/default/libvirt-bin
+  # and /etc/libvirt/libvirtd.conf.
+  local toggle="$1"
+  juju-log "$CHARM: Configuring libvirt tcp listening: $toggle."
+  local cur_opts=$(grep "^libvirtd_opts" /etc/default/libvirt-bin |
+                   cut -d= -f2 |  sed -e 's/\"//g')
+  local new_opts=""
+
+  if [[ "$toggle" == "on" ]] ; then
+    if [[ -z "$cur_opts" ]] ; then
+      echo "libvirtd_opts=\"-d -l\"" >>/etc/default/libvirt-bin
+    elif ! echo "$cur_opts" | grep -q "\-l" ; then
+      new_opts="$cur_opts -l"
+      sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
+    fi
+    set_or_update "listen_tcp" 1 $LIBVIRTD_CONF
+  elif [[ "$toggle" == "off" ]] ; then
+    if echo "$cur_opts" | grep -q "\-l" ; then
+      new_opts=$(echo $cur_opts | sed -e 's/\-l//g')
+    fi
+    set_or_update "listen_tcp" 0  $LIBVIRTD_CONF
+  fi
+
+  [[ -n "$new_opts" ]] &&
+    sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
+
+  return 0
+}
+
+
+function configure_migration {
+  local enable_migration=$(config-get enable-live-migration)
+
+  if [[ "$enable_migration" != "True" ]] &&
+     [[ "$enable_migraiton" != "true" ]] ; then
+     libvirt_tcp_listening "off"
+     return $?
+  fi
+
+  libvirt_tcp_listening "on"
+
+  case "$(config-get migration-auth-type)" in
+    "none"|"None")
+      set_or_update "listen_tls" 0 $LIBVIRTD_CONF
+      set_or_update "auth_tcp" "\"none\"" $LIBVIRTD_CONF
+      ;;
+    "ssh")
+      set_or_update "listen_tls" 0 $LIBVIRTD_CONF
+      set_or_update "live_migration_uri" "qemu+ssh://%s/system" $NOVA_CONF
+      initialize_ssh_keys
+      # check in with nova-c-c and register our new key.
+      for id in $(relation-ids cloud-compute) ; do
+        compute_joined $id
+      done
+      service_ctl nova-compute restart ;;
+    "sasl") return 0 ;;
+  esac
+}
+
 function configure_libvirt {
   cat > /etc/libvirt/qemu.conf << EOF
 # File installed by Juju nova-compute charm
@@ -175,5 +260,12 @@ cgroup_device_acl = [
    "/dev/rtc", "/dev/hpet", "/dev/net/tun",
 ]
 EOF
-  service libvirt-bin reload
+  configure_migration
+  service libvirt-bin restart
+}
+
+function migration_enabled {
+  local migration="$(config-get enable-live-migration)"
+  [[ "$migration" == "true" ]] || [[ "$migration" == "True" ]] && return 0
+  return 1
 }

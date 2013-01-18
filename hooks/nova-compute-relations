@@ -35,6 +35,11 @@ function config_changed() {
     do_openstack_upgrade "$install_src" $PACKAGES
   fi
 
+  # set this here until its fixed in grizzly packaging. (adam_g)
+  [[ "$cur" == "grizzly" ]] &&
+    set_or_update "compute_driver" "libvirt.LibvirtDriver"
+
+  configure_libvirt
   set_config_flags
   service_ctl all restart
 }
@@ -141,6 +146,18 @@ function image-service_changed {
   service_ctl all restart
 }
 
+function compute_joined {
+  migration_enabled || return 0
+  local relid="$1"
+  [[ -n "$relid" ]] && relid="-r $relid"
+  migration_auth="$(config-get migration-auth-type)"
+  case "$migration_auth" in
+    "none"|"None") return 0 ;;
+    "ssh") relation-set $relid ssh_public_key="$(cat /root/.ssh/id_rsa.pub)" ;;
+  esac
+  relation-set $relid migration_auth_type="$migration_auth"
+}
+
 function compute_changed {
   # nova-c-c will inform us of the configured network manager.  nova-compute
   # needs to configure itself accordingly.
@@ -184,6 +201,21 @@ function compute_changed {
   # nova-c-c informs us of what volume service has been deployed.
   volume_service=`relation-get volume_service`
   [[ -n "$volume_service" ]] && configure_volume_service "$volume_service"
+
+  if migration_enabled ; then
+    case "$(config-get migration-auth-type)" in
+      "ssh")
+          local known_hosts="$(relation-get known_hosts)"
+          local authorized_keys="$(relation-get authorized_keys)"
+          if [[ -n "$known_hosts" ]] &&
+             [[ -n "$authorized_keys" ]] ; then
+            juju-log "$CHARM: Saving new known_hosts+authorized_keys file."
+            echo "$known_hosts" | base64 -di >/root/.ssh/known_hosts
+            echo "$authorized_keys" | base64 -di >/root/.ssh/authorized_keys
+          fi
+          ;;
+    esac
+  fi
 
   # restart on all changed events. nova-c-c may send out a uuid to trigger
   # remote restarts of services here (after db migrations, for instance)
@@ -258,6 +290,6 @@ case $ARG0 in
   "identity-service-relation-changed") exit 0 ;;
   "ceph-relation-joined") ceph_joined;;
   "ceph-relation-changed") ceph_changed;;
-  "cloud-compute-relation-joined" ) exit 0 ;;
+  "cloud-compute-relation-joined" ) compute_joined ;;
   "cloud-compute-relation-changed") compute_changed ;;
 esac
