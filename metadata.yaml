@@ -17,3 +17,6 @@ requires:
     interface: glance
   ceph:
     interface: ceph-client
+peers:
+  compute-peer:
+    interface: nova
