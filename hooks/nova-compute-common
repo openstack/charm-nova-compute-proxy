@@ -7,6 +7,7 @@ CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
 QUANTUM_CONF="/etc/quantum/quantum.conf"
+MULTI_HOST=$(config-get multi-host)
 
 if [ -f /etc/nova/nm.conf ]; then
     NET_MANAGER=$(cat /etc/nova/nm.conf)
@@ -28,7 +29,9 @@ case $NET_MANAGER in
     esac
     ;;
   "FlatManager"|"FlatDHCPManager")
-    SERVICES="$SERVICES nova-api nova-network"
+    if [[ "$MULTI_HOST" == "yes" ]] ; then
+      SERVICES="$SERVICES nova-api nova-network"
+    fi
     ;;
 esac
 
@@ -102,8 +105,10 @@ function configure_network_manager {
 
   case $net_manager in
     "FlatManager"|"FlatDHCPManager")
-      apt-get -y install nova-api nova-network
-      SERVICES="$SERVICES nova-api nova-network"
+      if [[ "$MULTI_HOST" == "yes" ]] ; then
+        apt-get -y install nova-api nova-network
+        SERVICES="$SERVICES nova-api nova-network"
+      fi
       ;;&
     "FlatManager")
       local bridge_ip=$(config-get bridge-ip)
@@ -176,4 +181,31 @@ cgroup_device_acl = [
 ]
 EOF
   service libvirt-bin reload
+}
+
+function give_me_numbers {
+  local name="$1"
+  local address=
+
+  case "$name" in
+    [A-Za-z]*)
+      address=$(getent hosts "$name" | awk '{print $1}')
+      case "$address" in
+        127.*)
+          address=$(dig +short "$name")
+          if [ -z "$address" ]; then
+            echo "$name"
+          fi
+          echo "$address"
+          ;;
+        *)
+          echo "$address"
+          ;;
+      esac
+      ;;
+    *)
+      # not a name, maybe it's an address?
+      echo "$name"
+      ;;
+  esac
 }
