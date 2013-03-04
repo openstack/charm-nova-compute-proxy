@@ -182,30 +182,3 @@ cgroup_device_acl = [
 EOF
   service libvirt-bin reload
 }
-
-function give_me_numbers {
-  local name="$1"
-  local address=
-
-  case "$name" in
-    [A-Za-z]*)
-      address=$(getent hosts "$name" | awk '{print $1}')
-      case "$address" in
-        127.*)
-          address=$(dig +short "$name")
-          if [ -z "$address" ]; then
-            echo "$name"
-          fi
-          echo "$address"
-          ;;
-        *)
-          echo "$address"
-          ;;
-      esac
-      ;;
-    *)
-      # not a name, maybe it's an address?
-      echo "$name"
-      ;;
-  esac
-}
