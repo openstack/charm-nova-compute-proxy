@@ -9,6 +9,7 @@ else
 fi
 
 function install_hook {
+  [ -d exec.d ] && ( for f in exec.d/*/charm-pre-install; do [ -x $f ] && /bin/sh -c "$f";done )
   local virt_type=$(config-get virt-type)
   local compute_pkg=$(determine_compute_package "$virt_type")
   apt-get -y install python-software-properties || exit 1
@@ -18,6 +19,10 @@ function install_hook {
   service_ctl all stop
   set_or_update "auth_strategy" "keystone"
   configure_libvirt
+}
+
+function upgrade_hook {
+  [ -d exec.d ] && ( for f in exec.d/*/charm-pre-install; do [ -x $f ] && /bin/sh -c "$f";done )
 }
 
 function config_changed() {
@@ -203,7 +208,7 @@ function ceph_changed {
   MONS=`relation-list`
   mon_hosts=""
   for mon in $MONS; do
-    mon_hosts="$mon_hosts `relation-get private-address $mon`:6789"
+    mon_hosts="$mon_hosts $(get_ip $(relation-get private-address $mon)):6789"
   done
   cat > /etc/ceph/ceph.conf << EOF
 [global]
@@ -234,6 +239,7 @@ EOF
 
 case $ARG0 in
   "install") install_hook ;;
+  "upgrade-charm") upgrade_hook ;;
   "start"|"stop") exit 0 ;;
   "config-changed") config_changed ;;
   "amqp-relation-joined") amqp_joined ;;
