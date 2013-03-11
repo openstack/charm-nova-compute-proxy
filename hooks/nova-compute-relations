@@ -217,6 +217,16 @@ function compute_changed {
     esac
   fi
 
+  # If Keytone is configured manage SSL certs, nova-compute needs a copy
+  # of its CA installed.
+  local ca_cert="$(relation-get ca_cert)"
+  if [[ -n "$ca_cert" ]] ; then
+    juju-log "Installing Keystone CA certificate."
+    ca_cert="$(echo $ca_cert | base64 -di)"
+    echo "$ca_cert" >/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt
+    update-ca-certificates
+  fi
+
   # restart on all changed events. nova-c-c may send out a uuid to trigger
   # remote restarts of services here (after db migrations, for instance)
   service_ctl all restart

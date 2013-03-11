@@ -130,7 +130,7 @@ function configure_network_manager {
         && exit 0
       set_or_update "network_api_class" "nova.network.quantumv2.api.API"
       set_or_update "quantum_auth_strategy" "keystone"
-      set_or_update "quantum_url" "http://$(relation-get quantum_host):9696"
+      set_or_update "quantum_url" "$(relation-get quantum_url)"
       set_or_update "quantum_admin_tenant_name" "$(relation-get service_tenant)"
       set_or_update "quantum_admin_username" "$(relation-get service_username)"
       set_or_update "quantum_admin_password" "$(relation-get service_password)"
