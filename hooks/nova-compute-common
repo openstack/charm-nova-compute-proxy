@@ -96,15 +96,11 @@ function configure_network_manager {
     exit 1
   }
 
-  # Store the network manager and quantum plugin
-  # for use in later hook invocations
-  [[ -n $net_manager ]] && echo $net_manager > /etc/nova/nm.conf
-  [[ -n $quantum_plugin ]] && echo $quantum_plugin > /etc/nova/quantum_plugin.conf
-
   case $net_manager in
     "FlatManager"|"FlatDHCPManager")
       apt-get -y install nova-api nova-network
       SERVICES="$SERVICES nova-api nova-network"
+      [[ -n $net_manager ]] && echo $net_manager > /etc/nova/nm.conf
       ;;&
     "FlatManager")
       local bridge_ip=$(config-get bridge-ip)
@@ -160,6 +156,8 @@ function configure_network_manager {
           ;;
       esac
       set_or_update "bind_host" "0.0.0.0" "$QUANTUM_CONF"
+      [[ -n $net_manager ]] && echo $net_manager > /etc/nova/nm.conf
+      [[ -n $quantum_plugin ]] && echo $quantum_plugin > /etc/nova/quantum_plugin.conf
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
