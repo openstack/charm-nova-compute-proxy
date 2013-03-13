@@ -29,7 +29,7 @@ case $NET_MANAGER in
     esac
     ;;
   "FlatManager"|"FlatDHCPManager")
-    SERVICES="$SERVICES nova-api nova-network"
+    SERVICES="$SERVICES nova-api-metadata nova-network"
     ;;
 esac
 
