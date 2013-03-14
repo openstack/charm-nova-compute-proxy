@@ -284,7 +284,7 @@ EOF
     virsh secret-define --file /etc/ceph/secret.xml
     virsh secret-set-value --secret $UUID --base64 $KEY
     set_or_update rbd_user $SERVICE_NAME
-    set_or_update rbd_secret_uuid $uuid
+    set_or_update rbd_secret_uuid $UUID
     set_or_update rbd_pool nova
     service_ctl all restart
   fi
