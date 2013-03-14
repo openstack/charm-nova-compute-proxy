@@ -267,8 +267,12 @@ function ceph_changed {
 EOF
 
   if [ ! -f /etc/ceph/secret.xml ]; then
+    # This is just a label and it must be consistent across
+    # nova-compute nodes to support live migration.
+    UUID="514c9fca-8cbe-11e2-9c52-3bc8c7819472"
     cat > /etc/ceph/secret.xml << EOF
 <secret ephemeral='no' private='no'>
+   <uuid>$UUID</uuid>
    <usage type='ceph'>
      <name>client.$SERVICE_NAME secret</name>
    </usage>
@@ -277,8 +281,8 @@ EOF
     # Create secret for libvirt usage
     # note that this does limit ceph usage to 
     # KVM only at this point in time.
-    uuid=$(virsh secret-define --file /etc/ceph/secret.xml | cut -d " " -f 2)
-    virsh secret-set-value --secret $uuid --base64 $KEY
+    virsh secret-define --file /etc/ceph/secret.xml
+    virsh secret-set-value --secret $UUID --base64 $KEY
     set_or_update rbd_user $SERVICE_NAME
     set_or_update rbd_secret_uuid $uuid
     set_or_update rbd_pool nova
