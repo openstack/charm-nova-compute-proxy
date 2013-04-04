@@ -63,6 +63,7 @@ with open('$conf_file', 'wb') as configfile:
       fi
       ;;
   esac
+  CONFIG_CHANGED="True"
 }
 
 # Upgrade Helpers

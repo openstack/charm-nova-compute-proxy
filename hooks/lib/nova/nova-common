@@ -2,6 +2,8 @@
 
 # Common utility functions used across all nova charms.
 
+CONFIG_CHANGED=False
+
 # Load the common OpenStack helper library.
 if [[ -e $CHARM_DIR/lib/openstack-common ]] ; then
   . $CHARM_DIR/lib/openstack-common

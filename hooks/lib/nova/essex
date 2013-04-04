@@ -39,4 +39,5 @@ nova_set_or_update() {
     juju-log "$CHARM: Setting new option $key=$value in $conf_file"
     echo "$out$value" >>$conf_file
   fi
+  CONFIG_CHANGED=True
 }
