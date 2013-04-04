@@ -113,7 +113,7 @@ function db_joined {
 }
 
 function db_changed {
-  local db_host=`relation-get private-address`
+  local db_host=`relation-get db_host`
   local db_password=`relation-get nova_password`
 
   if [[ -z $db_host ]] || [[ -z $db_password ]] ; then
