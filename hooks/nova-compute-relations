@@ -178,21 +178,27 @@ function compute_changed {
       done
       # Rabbit MQ relation may also already be in place
       # shared vhost with nova so just grab settings and
-      # configure
+      # configure. need to be sure to use VIP if clustered.
+      local rabbit_clustered="" rabbit_vip="" rabbit_host="" rabbit_password=""
       r_ids="$(relation-ids amqp)"
       for id in $r_ids ; do
         for unit in $(relation-list -r $id) ; do
-          local rabbit_host=$(relation-get -r $id private-address $unit)
-          local rabbit_password=$(relation-get -r $id password $unit)
-          if [[ -n $rabbit_host ]] && \
-             [[ -n $rabbit_password ]]; then
-            set_or_update rabbit_host "$rabbit_host" "$QUANTUM_CONF"
-            set_or_update rabbit_userid "$(config-get rabbit-user)" "$QUANTUM_CONF"
-            set_or_update rabbit_password "$rabbit_password" "$QUANTUM_CONF"
-            set_or_update rabbit_virtual_host "$(config-get rabbit-vhost)" "$QUANTUM_CONF"
-          fi
-        done
+          rabbit_clustered=$(relation-get -r $id clustered $unit)
+          rabbit_vip=$(relation-get -r $id vip $unit)
+          rabbit_host=$(relation-get -r $id private-address $unit)
+          rabbit_password=$(relation-get -r $id password $unit)
+       done
       done
+      if [[ -n "$rabbit_clustered" ]] ; then
+        rabbit_host="$rabbit_vip"
+      fi
+      if [[ -n $rabbit_host ]] && \
+         [[ -n $rabbit_password ]]; then
+        set_or_update rabbit_host "$rabbit_host" "$QUANTUM_CONF"
+        set_or_update rabbit_userid "$(config-get rabbit-user)" "$QUANTUM_CONF"
+        set_or_update rabbit_password "$rabbit_password" "$QUANTUM_CONF"
+        set_or_update rabbit_virtual_host "$(config-get rabbit-vhost)" "$QUANTUM_CONF"
+      fi
     else
       configure_network_manager "$network_manager"
     fi
