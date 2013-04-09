@@ -124,6 +124,8 @@ function configure_network_manager {
       local keystone_host=$(relation-get keystone_host)
       [[ -z $keystone_host ]] && juju-log "nova-compute: Missing keystone host" \
         && exit 0
+      # XXX(adam_g): Need to check for unset values here, otherwise it errors
+      # if nova-c-c<->nova-compute is made before keystone<->nova-c-c
       set_or_update "network_api_class" "nova.network.quantumv2.api.API"
       set_or_update "quantum_auth_strategy" "keystone"
       set_or_update "quantum_url" "$(relation-get quantum_url)"
