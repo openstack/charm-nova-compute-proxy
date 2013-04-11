@@ -183,10 +183,12 @@ function compute_changed {
       r_ids="$(relation-ids amqp)"
       for id in $r_ids ; do
         for unit in $(relation-list -r $id) ; do
-          rabbit_clustered=$(relation-get -r $id clustered $unit)
-          rabbit_vip=$(relation-get -r $id vip $unit)
+          [[ -z "$rabbit_clustered" ]] &&
+            rabbit_clustered=$(relation-get -r $id clustered $unit)
+          [[ -z "$rabbit_vip" ]] && rabbit_vip=$(relation-get -r $id vip $unit)
+          [[ -z "$rabbit_password" ]] &&
+            rabbit_password=$(relation-get -r $id password $unit)
           rabbit_host=$(relation-get -r $id private-address $unit)
-          rabbit_password=$(relation-get -r $id password $unit)
        done
       done
       if [[ -n "$rabbit_clustered" ]] ; then
