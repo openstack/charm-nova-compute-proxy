@@ -8,6 +8,7 @@ NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
 QUANTUM_CONF="/etc/quantum/quantum.conf"
 LIBVIRTD_CONF="/etc/libvirt/libvirtd.conf"
+HOOKS_DIR="$CHARM_DIR/hooks"
 
 if [ -f /etc/nova/nm.conf ]; then
     NET_MANAGER=$(cat /etc/nova/nm.conf)
@@ -33,10 +34,10 @@ case $NET_MANAGER in
     ;;
 esac
 
-if [[ -e $CHARM_DIR/lib/nova/nova-common ]] ; then
-  . $CHARM_DIR/lib/nova/nova-common
+if [[ -e $HOOKS_DIR/lib/nova/nova-common ]] ; then
+  . $HOOKS_DIR/lib/nova/nova-common
 else
-  juju-log "$CHARM: Couldn't load $CHARM_DIR/lib/nova-common" && exit 1
+  juju-log "$CHARM: Couldn't load $HOOKS_DIR/lib/nova-common" && exit 1
 fi
 
 determine_compute_package() {

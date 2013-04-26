@@ -1,11 +1,11 @@
 #!/bin/bash -e
-CHARM_DIR=$(dirname $0)
+HOOKS_DIR="$CHARM_DIR/hooks"
 ARG0=${0##*/}
 
-if [[ -e $CHARM_DIR/nova-compute-common ]] ; then
-  . $CHARM_DIR/nova-compute-common
+if [[ -e $HOOKS_DIR/nova-compute-common ]] ; then
+  . $HOOKS_DIR/nova-compute-common
 else
-  juju-log "ERROR: Could not load nova-compute-common from $CHARM_DIR"
+  juju-log "ERROR: Could not load nova-compute-common from $HOOKS_DIR"
 fi
 
 function install_hook {
