@@ -137,12 +137,18 @@ function db_changed {
 }
 
 function image-service_changed {
-  GLANCE_API_SERVER=`relation-get glance-api-server`
-  if [[ -z $GLANCE_API_SERVER ]] ; then
-    echo "image-service_changed: GLANCE_API_SERVER not yet set. Exit 0 and retry"
+  local api_server=`relation-get glance-api-server`
+  if [[ -z $api_server ]] ; then
+    echo "image-service_changed: api_server not yet set. Exit 0 and retry"
     exit 0
   fi
-  set_or_update glance_api_servers $GLANCE_API_SERVER
+
+  if [[ "$(get_os_codename_package nova-common)" == "essex" ]] ; then
+    # essex needs glance_api_servers urls stripped of protocol.
+    api_server="$(echo $api_server | awk '{gsub(/http:\/\/|https:\/\//,"")}1')"
+  fi
+
+  set_or_update glance_api_servers $api_server
   service_ctl all restart
 }
 
