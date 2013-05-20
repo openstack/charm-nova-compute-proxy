@@ -8,6 +8,9 @@ description: |
 provides:
   cloud-compute:
     interface: nova-compute
+  nrpe-external-master:
+    interface: nrpe-external-master
+    scope: container
 requires:
   shared-db:
     interface: mysql-shared

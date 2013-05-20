@@ -37,7 +37,11 @@ options:
   virt-type:
     default: kvm
     type: string
-    description: Virtualization flavor (kvm, xen, uml, lxc, qemu)
+    description: "Virtualization flavor. Supported: kvm, xen, uml, lxc. qemu"
+  multi-host:
+    default: "yes"
+    type: string
+    description: Whether to run nova-api and nova-network on the compute nodes.
   enable-live-migration:
     default: False
     type: boolean
@@ -70,3 +74,13 @@ options:
     default: None
     type: string
     description: Comma separated list of key=value config flags to be set in nova.conf.
+  nagios_context:
+    default: "juju"
+    type: string
+    description: |
+      Used by the nrpe-external-master subordinate charm.
+      A string that will be prepended to instance name to set the host name
+      in nagios. So for instance the hostname would be something like:
+          juju-myservice-0
+      If you're running multiple environments with the same services in them
+      this allows you to differentiate between them.

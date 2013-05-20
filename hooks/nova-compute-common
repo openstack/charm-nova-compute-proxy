@@ -9,6 +9,7 @@ API_CONF="/etc/nova/api-paste.ini"
 QUANTUM_CONF="/etc/quantum/quantum.conf"
 LIBVIRTD_CONF="/etc/libvirt/libvirtd.conf"
 HOOKS_DIR="$CHARM_DIR/hooks"
+MULTI_HOST=$(config-get multi-host)
 
 if [ -f /etc/nova/nm.conf ]; then
     NET_MANAGER=$(cat /etc/nova/nm.conf)
@@ -30,7 +31,9 @@ case $NET_MANAGER in
     esac
     ;;
   "FlatManager"|"FlatDHCPManager")
-    SERVICES="$SERVICES nova-api nova-network"
+    if [[ "$MULTI_HOST" == "yes" ]] ; then
+      SERVICES="$SERVICES nova-api nova-network"
+    fi
     ;;
 esac
 
@@ -99,8 +102,10 @@ function configure_network_manager {
 
   case $net_manager in
     "FlatManager"|"FlatDHCPManager")
-      apt-get -y install nova-api nova-network
-      SERVICES="$SERVICES nova-api nova-network"
+      if [[ "$MULTI_HOST" == "yes" ]] ; then
+        apt-get -y install nova-api nova-network
+        SERVICES="$SERVICES nova-api nova-network"
+      fi
       [[ -n $net_manager ]] && echo $net_manager > /etc/nova/nm.conf
       ;;&
     "FlatManager")
