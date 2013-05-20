@@ -128,7 +128,7 @@ function configure_network_manager {
       ;;
     "Quantum")
       local keystone_host="$(relation-get keystone_host)"
-      local auth_port="$(relation-get auth-port)"
+      local auth_port="$(relation-get auth_port)"
       local quantum_url="$(relation-get quantum_url)"
       local quantum_admin_tenant_name="$(relation-get service_tenant)"
       local quantum_admin_username="$(relation-get service_username)"
