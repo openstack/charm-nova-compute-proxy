@@ -93,5 +93,5 @@ nova_post_upgrade() {
     trigger_remote_service_restarts
   fi
 
-  juju-log "$CHARM: Post-upgrade hook complete: $upgrade_from -> folsom."
+  juju-log "$CHARM: Post-upgrade hook complete: $upgrade_from -> grizzly."
 }
