@@ -76,6 +76,22 @@ nova_pre_upgrade() {
 nova_post_upgrade() {
   # Post-upgrade helper.  Caller should pass the version of OpenStack we are
   # upgrading from.
-  juju-log "$CHARM: Running post-upgrade hook: $upgrade_from -> folsom."
-  # nothing to do here yet.
+  local upgrade_from="$1"
+  juju-log "$CHARM: Running post-upgrade hook: $upgrade_from -> grizzly."
+  # We only support folsom -> grizzly, currently.
+  [[ "$upgrade_from" != "folsom" ]] &&
+    error_out "Unsupported upgrade: $upgrade_from -> grizzly"
+
+  # This may be dangerous, if we are upgrading a number of units at once
+  # and they all begin the same migration concurrently.  Migrate only from
+  # the cloud controller(s).
+  if [[ "$CHARM" == "nova-cloud-controller" ]] ; then
+    juju-log "$CHARM: Migrating nova database."
+    /usr/bin/nova-manage db sync
+
+    # Trigger a service restart on all other nova nodes.
+    trigger_remote_service_restarts
+  fi
+
+  juju-log "$CHARM: Post-upgrade hook complete: $upgrade_from -> folsom."
 }
