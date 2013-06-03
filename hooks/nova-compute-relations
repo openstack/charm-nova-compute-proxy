@@ -1,11 +1,11 @@
 #!/bin/bash -e
-CHARM_DIR=$(dirname $0)
+HOOKS_DIR="$CHARM_DIR/hooks"
 ARG0=${0##*/}
 
-if [[ -e $CHARM_DIR/nova-compute-common ]] ; then
-  . $CHARM_DIR/nova-compute-common
+if [[ -e $HOOKS_DIR/nova-compute-common ]] ; then
+  . $HOOKS_DIR/nova-compute-common
 else
-  juju-log "ERROR: Could not load nova-compute-common from $CHARM_DIR"
+  juju-log "ERROR: Could not load nova-compute-common from $HOOKS_DIR"
 fi
 
 function install_hook {
@@ -40,6 +40,11 @@ function config_changed() {
     do_openstack_upgrade "$install_src" $PACKAGES
   fi
 
+  # set this here until its fixed in grizzly packaging. (adam_g)
+  [[ "$cur" == "grizzly" ]] &&
+    set_or_update "compute_driver" "libvirt.LibvirtDriver"
+
+  configure_libvirt
   set_config_flags
   service_ctl all restart
 }
@@ -65,6 +70,18 @@ function amqp_changed {
      [[ -z $rabbit_password ]] ; then
       juju-log "$CHARM - amqp_changed: rabbit_host||rabbit_password not set."
       exit 0
+  fi
+
+  # if the rabbitmq service is clustered among nodes with hacluster,
+  # point to its vip instead of its private-address.
+  local clustered=$(relation-get clustered)
+  if [[ -n "$clustered" ]] ; then
+    juju-log "$CHARM - ampq_changed: Configuring for "\
+             "access to haclustered rabbitmq service."
+    local vip=$(relation-get vip)
+    [[ -z "$vip" ]] && juju-log "$CHARM - amqp_changed: Clustered but no vip."\
+      && exit 0
+    rabbit_host="$vip"
   fi
 
   local rabbit_user=$(config-get rabbit-user)
@@ -101,7 +118,7 @@ function db_joined {
 }
 
 function db_changed {
-  local db_host=`relation-get private-address`
+  local db_host=`relation-get db_host`
   local db_password=`relation-get nova_password`
 
   if [[ -z $db_host ]] || [[ -z $db_password ]] ; then
@@ -125,13 +142,31 @@ function db_changed {
 }
 
 function image-service_changed {
-  GLANCE_API_SERVER=`relation-get glance-api-server`
-  if [[ -z $GLANCE_API_SERVER ]] ; then
-    echo "image-service_changed: GLANCE_API_SERVER not yet set. Exit 0 and retry"
+  local api_server=`relation-get glance-api-server`
+  if [[ -z $api_server ]] ; then
+    echo "image-service_changed: api_server not yet set. Exit 0 and retry"
     exit 0
   fi
-  set_or_update glance_api_servers $GLANCE_API_SERVER
+
+  if [[ "$(get_os_codename_package nova-common)" == "essex" ]] ; then
+    # essex needs glance_api_servers urls stripped of protocol.
+    api_server="$(echo $api_server | awk '{gsub(/http:\/\/|https:\/\//,"")}1')"
+  fi
+
+  set_or_update glance_api_servers $api_server
   service_ctl all restart
+}
+
+function compute_joined {
+  migration_enabled || return 0
+  local relid="$1"
+  [[ -n "$relid" ]] && relid="-r $relid"
+  migration_auth="$(config-get migration-auth-type)"
+  case "$migration_auth" in
+    "none"|"None") return 0 ;;
+    "ssh") relation-set $relid ssh_public_key="$(cat /root/.ssh/id_rsa.pub)" ;;
+  esac
+  relation-set $relid migration_auth_type="$migration_auth"
 }
 
 function compute_changed {
@@ -154,21 +189,29 @@ function compute_changed {
       done
       # Rabbit MQ relation may also already be in place
       # shared vhost with nova so just grab settings and
-      # configure
+      # configure. need to be sure to use VIP if clustered.
+      local rabbit_clustered="" rabbit_vip="" rabbit_host="" rabbit_password=""
       r_ids="$(relation-ids amqp)"
       for id in $r_ids ; do
         for unit in $(relation-list -r $id) ; do
-          local rabbit_host=$(relation-get -r $id private-address $unit)
-          local rabbit_password=$(relation-get -r $id password $unit)
-          if [[ -n $rabbit_host ]] && \
-             [[ -n $rabbit_password ]]; then
-            set_or_update rabbit_host "$rabbit_host" "$QUANTUM_CONF"
-            set_or_update rabbit_userid "$(config-get rabbit-user)" "$QUANTUM_CONF"
-            set_or_update rabbit_password "$rabbit_password" "$QUANTUM_CONF"
-            set_or_update rabbit_virtual_host "$(config-get rabbit-vhost)" "$QUANTUM_CONF"
-          fi
-        done
+          [[ -z "$rabbit_clustered" ]] &&
+            rabbit_clustered=$(relation-get -r $id clustered $unit)
+          [[ -z "$rabbit_vip" ]] && rabbit_vip=$(relation-get -r $id vip $unit)
+          [[ -z "$rabbit_password" ]] &&
+            rabbit_password=$(relation-get -r $id password $unit)
+          rabbit_host=$(relation-get -r $id private-address $unit)
+       done
       done
+      if [[ -n "$rabbit_clustered" ]] ; then
+        rabbit_host="$rabbit_vip"
+      fi
+      if [[ -n $rabbit_host ]] && \
+         [[ -n $rabbit_password ]]; then
+        set_or_update rabbit_host "$rabbit_host" "$QUANTUM_CONF"
+        set_or_update rabbit_userid "$(config-get rabbit-user)" "$QUANTUM_CONF"
+        set_or_update rabbit_password "$rabbit_password" "$QUANTUM_CONF"
+        set_or_update rabbit_virtual_host "$(config-get rabbit-vhost)" "$QUANTUM_CONF"
+      fi
     else
       configure_network_manager "$network_manager"
     fi
@@ -177,6 +220,31 @@ function compute_changed {
   # nova-c-c informs us of what volume service has been deployed.
   volume_service=`relation-get volume_service`
   [[ -n "$volume_service" ]] && configure_volume_service "$volume_service"
+
+  if migration_enabled ; then
+    case "$(config-get migration-auth-type)" in
+      "ssh")
+          local known_hosts="$(relation-get known_hosts)"
+          local authorized_keys="$(relation-get authorized_keys)"
+          if [[ -n "$known_hosts" ]] &&
+             [[ -n "$authorized_keys" ]] ; then
+            juju-log "$CHARM: Saving new known_hosts+authorized_keys file."
+            echo "$known_hosts" | base64 -di >/root/.ssh/known_hosts
+            echo "$authorized_keys" | base64 -di >/root/.ssh/authorized_keys
+          fi
+          ;;
+    esac
+  fi
+
+  # If Keytone is configured manage SSL certs, nova-compute needs a copy
+  # of its CA installed.
+  local ca_cert="$(relation-get ca_cert)"
+  if [[ -n "$ca_cert" ]] ; then
+    juju-log "Installing Keystone CA certificate."
+    ca_cert="$(echo $ca_cert | base64 -di)"
+    echo "$ca_cert" >/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt
+    update-ca-certificates
+  fi
 
   # restart on all changed events. nova-c-c may send out a uuid to trigger
   # remote restarts of services here (after db migrations, for instance)
@@ -218,8 +286,12 @@ function ceph_changed {
 EOF
 
   if [ ! -f /etc/ceph/secret.xml ]; then
+    # This is just a label and it must be consistent across
+    # nova-compute nodes to support live migration.
+    UUID="514c9fca-8cbe-11e2-9c52-3bc8c7819472"
     cat > /etc/ceph/secret.xml << EOF
 <secret ephemeral='no' private='no'>
+   <uuid>$UUID</uuid>
    <usage type='ceph'>
      <name>client.$SERVICE_NAME secret</name>
    </usage>
@@ -228,10 +300,10 @@ EOF
     # Create secret for libvirt usage
     # note that this does limit ceph usage to 
     # KVM only at this point in time.
-    uuid=$(virsh secret-define --file /etc/ceph/secret.xml | cut -d " " -f 2)
-    virsh secret-set-value --secret $uuid --base64 $KEY
+    virsh secret-define --file /etc/ceph/secret.xml
+    virsh secret-set-value --secret $UUID --base64 $KEY
     set_or_update rbd_user $SERVICE_NAME
-    set_or_update rbd_secret_uuid $uuid
+    set_or_update rbd_secret_uuid $UUID
     set_or_update rbd_pool nova
     service_ctl all restart
   fi
@@ -252,6 +324,6 @@ case $ARG0 in
   "identity-service-relation-changed") exit 0 ;;
   "ceph-relation-joined") ceph_joined;;
   "ceph-relation-changed") ceph_changed;;
-  "cloud-compute-relation-joined" ) exit 0 ;;
+  "cloud-compute-relation-joined" ) compute_joined ;;
   "cloud-compute-relation-changed") compute_changed ;;
 esac

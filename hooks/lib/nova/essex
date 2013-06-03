@@ -12,7 +12,7 @@ nova_set_or_update() {
 
   local nova_conf=${NOVA_CONF:-/etc/nova/nova.conf}
   local api_conf=${API_CONF:-/etc/nova/api-paste.ini}
-
+  local libvirtd_conf=${LIBVIRTD_CONF:-/etc/libvirt/libvirtd.conf}
   [[ -z $key ]] && juju-log "$CHARM set_or_update: value $value missing key" && exit 1
   [[ -z $value ]] && juju-log "$CHARM set_or_update: key $key missing value" && exit 1
   [[ -z "$conf_file" ]] && conf_file=$nova_conf
@@ -22,7 +22,7 @@ nova_set_or_update() {
                   pattern="--$key="
                   out=$pattern
                   ;;
-    "$api_conf") match="^$key = "
+    "$api_conf"|"$libvirtd_conf") match="^$key = "
                  pattern="$match"
                  out="$key = "
                  ;;
@@ -39,4 +39,5 @@ nova_set_or_update() {
     juju-log "$CHARM: Setting new option $key=$value in $conf_file"
     echo "$out$value" >>$conf_file
   fi
+  CONFIG_CHANGED=True
 }

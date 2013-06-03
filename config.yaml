@@ -42,6 +42,16 @@ options:
     default: "yes"
     type: string
     description: Whether to run nova-api and nova-network on the compute nodes.
+  enable-live-migration:
+    default: False
+    type: boolean
+    description: Configure libvirt for live migration.
+  migration-auth-type:
+    default: sasl
+    type: string
+    description: |
+      TCP authentication scheme for libvirt live migration.  Available options
+      include sasl or none.
   # needed if using flatmanager
   bridge-interface:
     default: br100

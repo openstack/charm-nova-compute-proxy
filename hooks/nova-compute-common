@@ -7,6 +7,8 @@ CONF_DIR="/etc/nova"
 NOVA_CONF=$(config-get nova-config)
 API_CONF="/etc/nova/api-paste.ini"
 QUANTUM_CONF="/etc/quantum/quantum.conf"
+LIBVIRTD_CONF="/etc/libvirt/libvirtd.conf"
+HOOKS_DIR="$CHARM_DIR/hooks"
 MULTI_HOST=$(config-get multi-host)
 
 if [ -f /etc/nova/nm.conf ]; then
@@ -35,10 +37,10 @@ case $NET_MANAGER in
     ;;
 esac
 
-if [[ -e $CHARM_DIR/lib/nova/nova-common ]] ; then
-  . $CHARM_DIR/lib/nova/nova-common
+if [[ -e $HOOKS_DIR/lib/nova/nova-common ]] ; then
+  . $HOOKS_DIR/lib/nova/nova-common
 else
-  juju-log "$CHARM: Couldn't load $CHARM_DIR/lib/nova-common" && exit 1
+  juju-log "$CHARM: Couldn't load $HOOKS_DIR/lib/nova-common" && exit 1
 fi
 
 determine_compute_package() {
@@ -52,7 +54,7 @@ determine_compute_package() {
     "xen") compute_pkg="nova-compute-xen";;
     "uml") compute_pkg="nova-compute-uml";;
     "lxc") compute_pkg="nova-compute-lxc";;
-    *) error_out" ERROR: Unsupported virt_type=$virt_type";;
+    *) error_out "ERROR: Unsupported virt_type=$virt_type";;
   esac
   echo "$compute_pkg"
 }
@@ -98,17 +100,13 @@ function configure_network_manager {
     exit 1
   }
 
-  # Store the network manager and quantum plugin
-  # for use in later hook invocations
-  [[ -n $net_manager ]] && echo $net_manager > /etc/nova/nm.conf
-  [[ -n $quantum_plugin ]] && echo $quantum_plugin > /etc/nova/quantum_plugin.conf
-
   case $net_manager in
     "FlatManager"|"FlatDHCPManager")
       if [[ "$MULTI_HOST" == "yes" ]] ; then
         apt-get -y install nova-api nova-network
         SERVICES="$SERVICES nova-api nova-network"
       fi
+      [[ -n $net_manager ]] && echo $net_manager > /etc/nova/nm.conf
       ;;&
     "FlatManager")
       local bridge_ip=$(config-get bridge-ip)
@@ -129,18 +127,39 @@ function configure_network_manager {
       set_or_update ec2_dmz_host $ec2_host
       ;;
     "Quantum")
-      local keystone_host=$(relation-get keystone_host)
-      [[ -z $keystone_host ]] && juju-log "nova-compute: Missing keystone host" \
-        && exit 0
+      local keystone_host="$(relation-get keystone_host)"
+      local auth_port="$(relation-get auth_port)"
+      local quantum_url="$(relation-get quantum_url)"
+      local quantum_admin_tenant_name="$(relation-get service_tenant)"
+      local quantum_admin_username="$(relation-get service_username)"
+      local quantum_admin_password="$(relation-get service_password)"
+
+      # might end up here before nova-c-c has processed keystone hooks
+      [[ -z "$keystone_host" ]] ||
+      [[ -z "$auth_port" ]] ||
+      [[ -z "$quantum_url" ]] ||
+      [[ -z "$quantum_admin_tenant_name" ]] ||
+      [[ -z "$quantum_admin_username" ]] ||
+      [[ -z "$quantum_admin_password" ]] &&
+        juju-log "nova-compute: Missing required data for Quantum config." &&
+          exit 0
       set_or_update "network_api_class" "nova.network.quantumv2.api.API"
       set_or_update "quantum_auth_strategy" "keystone"
-      set_or_update "quantum_url" "http://$(relation-get quantum_host):9696"
-      set_or_update "quantum_admin_tenant_name" "$(relation-get service_tenant)"
-      set_or_update "quantum_admin_username" "$(relation-get service_username)"
-      set_or_update "quantum_admin_password" "$(relation-get service_password)"
+      set_or_update "quantum_url" "$quantum_url"
+      set_or_update "quantum_admin_tenant_name" "$quantum_admin_tenant_name"
+      set_or_update "quantum_admin_username" "$quantum_admin_username"
+      set_or_update "quantum_admin_password" "$quantum_admin_password"
       set_or_update "quantum_admin_auth_url" \
-                    "http://$(relation-get keystone_host):$(relation-get auth_port)/v2.0"
-      set_or_update "force_config_drive" "True"
+                    "http://$keystone_host:$auth_port/v2.0"
+
+      local cur=$(get_os_codename_package "nova-common")
+      if dpkg --compare-versions $(get_os_version_codename $cur) gt '2012.2'; then
+        # Grizzly onwards supports metadata proxy so forcing use of config
+        # drive is not required.
+        set_or_update "force_config_drive" "False"
+      else
+        set_or_update "force_config_drive" "True"
+      fi
       case $quantum_plugin in
         "ovs")
           apt-get -y install openvswitch-datapath-dkms
@@ -157,6 +176,8 @@ function configure_network_manager {
           ;;
       esac
       set_or_update "bind_host" "0.0.0.0" "$QUANTUM_CONF"
+      [[ -n $net_manager ]] && echo $net_manager > /etc/nova/nm.conf
+      [[ -n $quantum_plugin ]] && echo $quantum_plugin > /etc/nova/quantum_plugin.conf
       ;;
     *) echo "ERROR: Invalid network manager $1" && exit 1 ;;
   esac
@@ -170,6 +191,83 @@ function configure_quantum_bridge {
   fi
 }
 
+function initialize_ssh_keys {
+  # generate ssh keypair for root if one does not exist or
+  # the pari is not complete.
+  local pub="/root/.ssh/id_rsa"
+  local priv="/root/.ssh/id_rsa.pub"
+  if [[ -e $pub ]] &&
+     [[ -e $priv ]] ; then
+    juju-log "$CHARM: SSH credentials already exist for root."
+    return 0
+  fi
+  juju-log "$CHARM: Initializing new SSH key pair for live migration."
+  [[ -e $pub ]] && mv $pub $pub.$(date +"%s")
+  [[ -e $priv ]] && mv $priv $priv.$(date +"%s")
+  local keyname=$(echo $JUJU_UNIT_NAME | sed -e 's,/,-,g')
+  echo -e "\n" | ssh-keygen -C "$keyname" -N ""
+}
+
+function libvirt_tcp_listening {
+  # toggle libvirtd's tcp listening in both /etc/default/libvirt-bin
+  # and /etc/libvirt/libvirtd.conf.
+  local toggle="$1"
+  juju-log "$CHARM: Configuring libvirt tcp listening: $toggle."
+  local cur_opts=$(grep "^libvirtd_opts" /etc/default/libvirt-bin |
+                   cut -d= -f2 |  sed -e 's/\"//g')
+  local new_opts=""
+
+  if [[ "$toggle" == "on" ]] ; then
+    if [[ -z "$cur_opts" ]] ; then
+      echo "libvirtd_opts=\"-d -l\"" >>/etc/default/libvirt-bin
+    elif ! echo "$cur_opts" | grep -q "\-l" ; then
+      new_opts="$cur_opts -l"
+      sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
+    fi
+    set_or_update "listen_tcp" 1 $LIBVIRTD_CONF
+  elif [[ "$toggle" == "off" ]] ; then
+    if echo "$cur_opts" | grep -q "\-l" ; then
+      new_opts=$(echo $cur_opts | sed -e 's/\-l//g')
+    fi
+    set_or_update "listen_tcp" 0  $LIBVIRTD_CONF
+  fi
+
+  [[ -n "$new_opts" ]] &&
+    sed -i "s|\(libvirtd_opts=\).*|\1\"$new_opts\"|" /etc/default/libvirt-bin
+
+  return 0
+}
+
+
+function configure_migration {
+  local enable_migration=$(config-get enable-live-migration)
+
+  if [[ "$enable_migration" != "True" ]] &&
+     [[ "$enable_migraiton" != "true" ]] ; then
+     libvirt_tcp_listening "off"
+     return $?
+  fi
+
+  libvirt_tcp_listening "on"
+
+  case "$(config-get migration-auth-type)" in
+    "none"|"None")
+      set_or_update "listen_tls" 0 $LIBVIRTD_CONF
+      set_or_update "auth_tcp" "\"none\"" $LIBVIRTD_CONF
+      ;;
+    "ssh")
+      set_or_update "listen_tls" 0 $LIBVIRTD_CONF
+      set_or_update "live_migration_uri" "qemu+ssh://%s/system" $NOVA_CONF
+      initialize_ssh_keys
+      # check in with nova-c-c and register our new key.
+      for id in $(relation-ids cloud-compute) ; do
+        compute_joined $id
+      done
+      service_ctl nova-compute restart ;;
+    "sasl") return 0 ;;
+  esac
+}
+
 function configure_libvirt {
   cat > /etc/libvirt/qemu.conf << EOF
 # File installed by Juju nova-compute charm
@@ -180,5 +278,12 @@ cgroup_device_acl = [
    "/dev/rtc", "/dev/hpet", "/dev/net/tun",
 ]
 EOF
-  service libvirt-bin reload
+  configure_migration
+  service libvirt-bin restart
+}
+
+function migration_enabled {
+  local migration="$(config-get enable-live-migration)"
+  [[ "$migration" == "true" ]] || [[ "$migration" == "True" ]] && return 0
+  return 1
 }

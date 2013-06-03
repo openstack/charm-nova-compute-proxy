@@ -3,6 +3,7 @@
 # Folsom-specific functions
 
 nova_set_or_update() {
+  # TODO: This needs to be shared among folsom, grizzly and beyond.
   # Set a config option in nova.conf or api-paste.ini, depending
   # Defaults to updating nova.conf
   local key="$1"
@@ -76,10 +77,10 @@ nova_post_upgrade() {
   # Post-upgrade helper.  Caller should pass the version of OpenStack we are
   # upgrading from.
   local upgrade_from="$1"
-  juju-log "$CHARM: Running post-upgrade hook: $upgrade_from -> folsom."
-  # We only support essex -> folsom, currently.
-  [[ "$upgrade_from" != "essex" ]] &&
-    error_out "Unsupported upgrade: $upgrade_from -> folsom"
+  juju-log "$CHARM: Running post-upgrade hook: $upgrade_from -> grizzly."
+  # We only support folsom -> grizzly, currently.
+  [[ "$upgrade_from" != "folsom" ]] &&
+    error_out "Unsupported upgrade: $upgrade_from -> grizzly"
 
   # This may be dangerous, if we are upgrading a number of units at once
   # and they all begin the same migration concurrently.  Migrate only from
@@ -92,44 +93,5 @@ nova_post_upgrade() {
     trigger_remote_service_restarts
   fi
 
-  # Packaging currently takes care of converting the Essex gflags format
-  # to .ini, but we need to update the api-paste.ini manually.  It can be
-  # updated directly from keystone, via the identity-service relation,
-  # if it exists.  Only services that require keystone credentials will
-  # have modified api-paste.ini, and only those services will have a .dpkg-dist
-  # version present.
-  local r_id=$(relation-ids identity-service)
-  if [[ -n "$r_id" ]] && [[ -e "$CONF_DIR/api-paste.ini.dpkg-dist" ]] ; then
-    # Backup the last api config, update the stock packaged version
-    # with our current Keystone info.
-    mv $API_CONF $CONF_DIR/api-paste.ini.juju-last
-    mv $CONF_DIR/api-paste.ini.dpkg-dist $CONF_DIR/api-paste.ini
-
-    unit=$(relation-list -r $r_id | head -n1)
-    # Note, this should never be called from an relation hook, only config-changed.
-    export JUJU_REMOTE_UNIT=$unit
-    service_port=$(relation-get -r $r_id service_port)
-    auth_port=$(relation-get -r $r_id auth_port)
-    service_username=$(relation-get -r $r_id service_username)
-    service_password=$(relation-get -r $r_id service_password)
-    service_tenant=$(relation-get -r $r_id service_tenant)
-    keystone_host=$(relation-get -r $r_id  private-address)
-    unset JUJU_REMOTE_UNIT
-
-    juju-log "$CHARM: Updating new api-paste.ini with keystone data from $unit:$r_id"
-    set_or_update "service_host" "$keystone_host" "$API_CONF"
-    set_or_update "service_port" "$service_port" "$API_CONF"
-    set_or_update "auth_host" "$keystone_host" "$API_CONF"
-    set_or_update "auth_port" "$auth_port" "$API_CONF"
-    set_or_update "auth_uri" "http://$keystone_host:$service_port/" "$API_CONF"
-    set_or_update "admin_tenant_name" "$service_tenant" "$API_CONF"
-    set_or_update "admin_user" "$service_username" "$API_CONF"
-    set_or_update "admin_password" "$service_password" "$API_CONF"
-  fi
-
-  # TEMPORARY
-  # RC3 packaging in cloud archive doesn't have this in postinst.  Do it here
-  sed -e "s,^root_helper=.\+,rootwrap_config=/etc/nova/rootwrap.conf," -i /etc/nova/nova.conf
-
-  juju-log "$CHARM: Post-upgrade hook complete: $upgrade_from -> folsom."
+  juju-log "$CHARM: Post-upgrade hook complete: $upgrade_from -> grizzly."
 }

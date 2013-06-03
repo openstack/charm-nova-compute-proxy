@@ -2,18 +2,21 @@
 
 # Common utility functions used across all nova charms.
 
+CONFIG_CHANGED=False
+HOOKS_DIR="$CHARM_DIR/hooks"
+
 # Load the common OpenStack helper library.
-if [[ -e $CHARM_DIR/lib/openstack-common ]] ; then
-  . $CHARM_DIR/lib/openstack-common
+if [[ -e $HOOKS_DIR/lib/openstack-common ]] ; then
+  . $HOOKS_DIR/lib/openstack-common
 else
-  juju-log "Couldn't load $CHARM_DIR/lib/opentack-common." && exit 1
+  juju-log "Couldn't load $HOOKS_DIR/lib/opentack-common." && exit 1
 fi
 
 set_or_update() {
   # Update config flags in nova.conf or api-paste.ini.
   # Config layout changed in Folsom, so this is now OpenStack release specific.
   local rel=$(get_os_codename_package "nova-common")
-  . $CHARM_DIR/lib/nova/$rel
+  . $HOOKS_DIR/lib/nova/$rel
   nova_set_or_update $@
 }
 
@@ -32,9 +35,15 @@ function set_config_flags() {
 
 configure_volume_service() {
   local svc="$1"
+  local cur_vers="$(get_os_codename_package "nova-common")"
   case "$svc" in
-    "cinder") set_or_update "volume_api_class" "nova.volume.cinder.API" ;;
-    "nova-volume") set_or_update "volume_api_class" "nova.volume.api.API" ;;
+    "cinder")
+      set_or_update "volume_api_class" "nova.volume.cinder.API" ;;
+    "nova-volume")
+      # nova-volume only supported before grizzly.
+      [[ "$cur_vers" == "essex" ]] || [[ "$cur_vers" == "folsom" ]] &&
+        set_or_update "volume_api_class" "nova.volume.api.API"
+      ;;
     *) juju-log "$CHARM ERROR - configure_volume_service: Invalid service $svc"
        return 1 ;;
   esac
@@ -49,11 +58,32 @@ function configure_network_manager {
       ;;
     "FlatDHCPManager")
       set_or_update "network_manager" "nova.network.manager.FlatDHCPManager"
+
+      if [[ "$CHARM" == "nova-compute" ]] ; then
+        local flat_interface=$(config-get flat-interface)
+        local ec2_host=$(relation-get ec2_host)
+        set_or_update flat_inteface "$flat_interface"
+        set_or_update ec2_dmz_host "$ec2_host"
+
+        # Ensure flat_interface has link.
+        if ip link show $flat_interface >/dev/null 2>&1 ; then
+          ip link set $flat_interface up
+        fi
+
+        # work around (LP: #1035172)
+        if [[ -e /dev/vhost-net ]] ; then
+          iptables -A POSTROUTING -t mangle -p udp --dport 68 -j CHECKSUM \
+            --checksum-fill
+        fi
+      fi
+
       ;;
     "Quantum")
       local local_ip=$(get_ip `unit-get private-address`)
-      [[ -n $local_ip ]] || juju-log "Unable to resolve local IP address" \
-        && exit 1
+      [[ -n $local_ip ]] || {
+        juju-log "Unable to resolve local IP address"
+        exit 1
+      }
       set_or_update "network_api_class" "nova.network.quantumv2.api.API"
       set_or_update "quantum_auth_strategy" "keystone"
       set_or_update "core_plugin" "$QUANTUM_CORE_PLUGIN" "$QUANTUM_CONF"
@@ -101,7 +131,7 @@ do_openstack_upgrade() {
 
   # load the release helper library for pre/post upgrade hooks specific to the
   # release we are upgrading to.
-  . $CHARM_DIR/lib/nova/$new_rel
+  . $HOOKS_DIR/lib/nova/$new_rel
 
   # new release specific pre-upgrade hook
   nova_pre_upgrade "$orig_os_rel"
