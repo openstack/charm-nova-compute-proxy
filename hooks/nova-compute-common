@@ -133,6 +133,7 @@ function configure_network_manager {
       local quantum_admin_tenant_name="$(relation-get service_tenant)"
       local quantum_admin_username="$(relation-get service_username)"
       local quantum_admin_password="$(relation-get service_password)"
+      local quantum_security_groups="$(relation-get quantum_security_groups)"
 
       # might end up here before nova-c-c has processed keystone hooks
       [[ -z "$keystone_host" ]] ||
@@ -143,6 +144,15 @@ function configure_network_manager {
       [[ -z "$quantum_admin_password" ]] &&
         juju-log "nova-compute: Missing required data for Quantum config." &&
           exit 0
+
+      local cur=$(get_os_codename_package "nova-common")
+      local vers=$(get_os_version_codename $cur)
+
+      [[ "$quantum_security_groups" == "yes" ]] &&
+      dpkg --compare-versions $vers lt '2013.1' &&
+        juju-log "Unable to use quantum security groups with < grizzly" &&
+          exit 1
+
       set_or_update "network_api_class" "nova.network.quantumv2.api.API"
       set_or_update "quantum_auth_strategy" "keystone"
       set_or_update "quantum_url" "$quantum_url"
@@ -152,8 +162,7 @@ function configure_network_manager {
       set_or_update "quantum_admin_auth_url" \
                     "http://$keystone_host:$auth_port/v2.0"
 
-      local cur=$(get_os_codename_package "nova-common")
-      if dpkg --compare-versions $(get_os_version_codename $cur) gt '2012.2'; then
+      if dpkg --compare-versions $vers gt '2012.2'; then
         # Grizzly onwards supports metadata proxy so forcing use of config
         # drive is not required.
         set_or_update "force_config_drive" "False"
@@ -166,12 +175,23 @@ function configure_network_manager {
           apt-get -y install quantum-plugin-openvswitch-agent
           local quantum_plugin_conf="/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini"
           set_or_update "core_plugin" "quantum.plugins.openvswitch.ovs_quantum_plugin.OVSQuantumPluginV2" "$QUANTUM_CONF"
-          set_or_update "libvirt_vif_driver" "nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver"
+          if dpkg --compare-versions $vers gt '2012.2'; then
+            set_or_update "libvirt_vif_driver" "nova.virt.libvirt.vif.LibvirtGenericVIFDriver"
+          else
+            set_or_update "libvirt_vif_driver" "nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver"
+          fi
           set_or_update "libvirt_use_virtio_for_bridges" "True"
           set_or_update "tenant_network_type" "gre" $quantum_plugin_conf "OVS"
           set_or_update "enable_tunneling" "True" $quantum_plugin_conf "OVS"
           set_or_update "tunnel_id_ranges" "1:1000" $quantum_plugin_conf "OVS"
           set_or_update "local_ip" "$private_address" $quantum_plugin_conf "OVS"
+          if [ "$quantum_security_groups" == "yes" ]; then
+            set_or_update "security_group_api" "quantum"
+            set_or_update "firewall_driver" "nova.virt.firewall.NoopFirewallDriver"
+            set_or_update "firewall_driver" \
+              "quantum.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver" \
+              $quantum_plugin_conf "SECURITYGROUP"
+          fi
           SERVICES="$SERVICES quantum-plugin-openvswitch-agent"
           ;;
       esac
