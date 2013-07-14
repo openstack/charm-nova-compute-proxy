@@ -8,9 +8,6 @@ description: |
 provides:
   cloud-compute:
     interface: nova-compute
-  nrpe-external-master:
-    interface: nrpe-external-master
-    scope: container
 requires:
   shared-db:
     interface: mysql-shared
@@ -20,6 +17,9 @@ requires:
     interface: glance
   ceph:
     interface: ceph-client
+  nrpe-external-master:
+    interface: nrpe-external-master
+    scope: container
 peers:
   compute-peer:
     interface: nova
