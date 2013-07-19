@@ -1,0 +1,10 @@
+branch: lp:charm-helpers
+destination: hooks/charmhelpers
+include:
+    - core
+    - contrib.openstack|inc=*
+    - contrib.storage
+    - contrib.hahelpers:
+        - apache
+        - ceph
+        - cluster

@@ -24,8 +24,7 @@ from charmhelpers.contrib.openstack.utils import (
 )
 
 from nova_compute_utils import (
-    PACKAGES,
-    RESTART_MAP,
+    determine_packages,
     import_authorized_keys,
     import_keystone_ca_cert,
     migration_enabled,
@@ -33,9 +32,11 @@ from nova_compute_utils import (
     configure_network_service,
     configure_volume_service,
     do_openstack_upgrade,
+    quantum_attribute,
     quantum_enabled,
-    quantum_plugin_config,
+    quantum_plugin,
     public_ssh_key,
+    restart_map,
     register_configs,
 )
 
@@ -51,11 +52,11 @@ CONFIGS = register_configs()
 def install():
     configure_installation_source(config('openstack-origin'))
     apt_update()
-    apt_install(PACKAGES, fatal=True)
+    apt_install(determine_packages(), fatal=True)
 
 
 @hooks.hook('config-changed')
-@restart_on_change(RESTART_MAP)
+@restart_on_change(restart_map())
 def config_changed():
     if openstack_upgrade_available('nova-common'):
         do_openstack_upgrade()
@@ -68,13 +69,13 @@ def config_changed():
 
 
 @hooks.hook('amqp-relation-joined')
-@restart_on_change(RESTART_MAP)
+@restart_on_change(restart_map())
 def amqp_joined():
     relation_set(username=config('rabbit-user'), vhost=config('rabbit-vhost'))
 
 
 @hooks.hook('amqp-relation-changed')
-@restart_on_change(RESTART_MAP)
+@restart_on_change(restart_map())
 def amqp_changed():
     if 'amqp' not in CONFIGS.complete_contexts():
         log('amqp relation incomplete. Peer not ready?')
@@ -91,18 +92,19 @@ def db_joined():
 
 
 @hooks.hook('shared-db-relation-changed')
-@restart_on_change(RESTART_MAP)
+@restart_on_change(restart_map())
 def db_changed():
     if 'shared-db' not in CONFIGS.complete_contexts():
         log('shared-db relation incomplete. Peer not ready?')
         return
     CONFIGS.write('/etc/nova/nova.conf')
     if quantum_enabled():
-        CONFIGS.write(quantum_plugin_config())
+        plugin = quantum_plugin()
+        CONFIGS.write(quantum_attribute(plugin, 'config'))
 
 
 @hooks.hook('image-service-relation-changed')
-@restart_on_change(RESTART_MAP)
+@restart_on_change(restart_map())
 def image_service_changed():
     if 'image-service' not in CONFIGS.complete_contexts():
         log('image-service relation incomplete. Peer not ready?')
@@ -124,7 +126,7 @@ def compute_joined(rid=None):
 
 
 @hooks.hook('cloud-compute-relation-changed')
-@restart_on_change(RESTART_MAP)
+@restart_on_change(restart_map())
 def compute_changed():
     configure_network_service()
     configure_volume_service()
@@ -133,7 +135,7 @@ def compute_changed():
 
 
 @hooks.hook('ceph-relation-joined')
-@restart_on_change(RESTART_MAP)
+@restart_on_change(restart_map())
 def ceph_joined():
     if not os.path.isdir('/etc/ceph'):
         os.mkdir('/etc/ceph')
@@ -141,7 +143,7 @@ def ceph_joined():
 
 
 @hooks.hook('ceph-relation-changed')
-@restart_on_change(RESTART_MAP)
+@restart_on_change(restart_map())
 def ceph_changed():
     if 'ceph' not in CONFIGS.complete_contexts():
         log('ceph relation incomplete. Peer not ready?')
