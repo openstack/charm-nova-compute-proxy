@@ -26,11 +26,11 @@ options:
     default: nova
     type: string
     decsription: Rabbitmq vhost
-  db-user:
+  database-user:
     default: nova
     type: string
     description: Username for database access
-  nova-db:
+  database:
     default: nova
     type: string
     description: Database name
