@@ -1,6 +1,6 @@
 from mock import patch
 
-from tests.test_utils import CharmTestCase
+from tests.test_utils import CharmTestCase, patch_open
 
 
 import hooks.nova_compute_utils as utils
@@ -60,30 +60,51 @@ class NovaComputeUtilsTests(CharmTestCase):
         ]
         self.assertEquals(ex, result)
 
-    # NOTE: These tests faill if run together, something is holding
-    # a reference to BASE_RESOURCE_MAP ?
     @patch.object(utils, 'network_manager')
     def test_resource_map_nova_network_no_multihost(self, net_man):
         self.test_config.set('multi-host', 'no')
         net_man.return_value = 'FlatDHCPManager'
-        result = utils.restart_map()
+        result = utils.resource_map()
         ex = {
-            '/etc/default/libvirt-bin': ['libvirt-bin'],
-            '/etc/libvirt/qemu.conf': ['libvirt-bin'],
-            '/etc/nova/nova-compute.conf': ['nova-compute'],
-            '/etc/nova/nova.conf': ['nova-compute']
+            '/etc/default/libvirt-bin': {
+                'contexts': [],
+                'services': ['libvirt-bin']
+            },
+            '/etc/libvirt/qemu.conf': {
+                'contexts': [],
+                'services': ['libvirt-bin']
+            },
+            '/etc/nova/nova-compute.conf': {
+                'contexts': [],
+                'services': ['nova-compute']
+            },
+            '/etc/nova/nova.conf': {
+                'contexts': [],
+                'services': ['nova-compute']
+            },
         }
         self.assertEquals(ex, result)
 
     @patch.object(utils, 'network_manager')
     def test_resource_map_nova_network(self, net_man):
         net_man.return_value = 'FlatDHCPManager'
-        result = utils.restart_map()
+        result = utils.resource_map()
         ex = {
-            '/etc/default/libvirt-bin': ['libvirt-bin'],
-            '/etc/libvirt/qemu.conf': ['libvirt-bin'],
-            '/etc/nova/nova-compute.conf': ['nova-compute'],
-            '/etc/nova/nova.conf': ['nova-compute', 'nova-api', 'nova-network']
+            '/etc/default/libvirt-bin': {
+                'contexts': [], 'services': ['libvirt-bin']
+            },
+            '/etc/libvirt/qemu.conf': {
+                'contexts': [],
+                'services': ['libvirt-bin']
+            },
+            '/etc/nova/nova-compute.conf': {
+                'contexts': [],
+                'services': ['nova-compute']
+            },
+            '/etc/nova/nova.conf': {
+                'contexts': [],
+                'services': ['nova-compute', 'nova-api', 'nova-network']
+            }
         }
         self.assertEquals(ex, result)
 
@@ -92,14 +113,47 @@ class NovaComputeUtilsTests(CharmTestCase):
     def test_resource_map_quantum_ovs(self, net_man, _plugin):
         net_man.return_value = 'Quantum'
         _plugin.return_value = 'ovs'
-        result = utils.restart_map()
+        result = utils.resource_map()
         ex = {
-            '/etc/default/libvirt-bin': ['libvirt-bin'],
-            '/etc/libvirt/qemu.conf': ['libvirt-bin'],
-            '/etc/nova/nova-compute.conf': ['nova-compute'],
-            '/etc/nova/nova.conf': ['nova-compute'],
-            '/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini':
-            ['quantum-plugin-openvswitch-agent'],
-            '/etc/quantum/quantum.conf': ['quantum-plugin-openvswitch-agent']
-        }
+            '/etc/default/libvirt-bin': {
+                'contexts': [],
+                'services': ['libvirt-bin']
+            },
+            '/etc/libvirt/qemu.conf': {
+                'contexts': [],
+                'services': ['libvirt-bin']
+            },
+            '/etc/nova/nova-compute.conf': {
+                'contexts': [],
+                'services': ['nova-compute']
+            },
+            '/etc/nova/nova.conf': {
+                'contexts': [],
+                'services': ['nova-compute']
+            },
+            '/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini': {
+                'contexts': [],
+                'services': ['quantum-plugin-openvswitch-agent']
+            },
+            '/etc/quantum/quantum.conf': {
+                'contexts': [],
+                'services': ['quantum-plugin-openvswitch-agent']}
+            }
+
         self.assertEquals(ex, result)
+
+    @patch('__builtin__.open')
+    @patch('pwd.getpwnam')
+    def test_public_ssh_key_not_found(self, getpwnam, _open):
+        _open.side_effect = Exception 
+        getpwnam.pw_dir = '/home/foo'
+        self.assertEquals(None, utils.public_ssh_key())
+
+
+    @patch('pwd.getpwnam')
+    def test_public_ssh_key(self, getpwnam):
+        getpwnam.pw_dir = '/home/foo'
+        with patch_open() as (_open, _file):
+            _file.read.return_value = 'mypubkey'
+            result = utils.public_ssh_key('foo')
+        self.assertEquals(result, 'mypubkey')

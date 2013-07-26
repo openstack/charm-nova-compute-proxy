@@ -1,4 +1,8 @@
-import copy
+
+from copy import copy, deepcopy
+import os
+import pwd
+
 from charmhelpers.core.hookenv import (
     config,
     log,
@@ -13,11 +17,23 @@ BASE_PACKAGES = [
     'genisoimage',  # was missing as a package dependency until raring.
 ]
 
-BASE_RESTART_MAP = {
-    '/etc/libvirt/qemu.conf': ['libvirt-bin'],
-    '/etc/default/libvirt-bin': ['libvirt-bin'],
-    '/etc/nova/nova.conf': ['nova-compute'],
-    '/etc/nova/nova-compute.conf': ['nova-compute'],
+BASE_RESOURCE_MAP = {
+    '/etc/libvirt/qemu.conf': {
+        'services': ['libvirt-bin'],
+        'contexts': [],
+    },
+    '/etc/default/libvirt-bin': {
+        'services': ['libvirt-bin'],
+        'contexts': [],
+    },
+    '/etc/nova/nova.conf': {
+        'services': ['nova-compute'],
+        'contexts': [],
+    },
+    '/etc/nova/nova-compute.conf': {
+        'services': ['nova-compute'],
+        'contexts': [],
+    },
 }
 
 
@@ -49,18 +65,18 @@ VIRT_TYPES = {
 CEPH_SECRET_UUID = '514c9fca-8cbe-11e2-9c52-3bc8c7819472'
 
 
-def restart_map():
+def resource_map():
     '''
-    Constructs a restart map based on charm config settings and relation
-    state.
+    Dynamically generate a map of resources that will be managed for a single
+    hook execution.
     '''
-    _restart_map = copy.copy(BASE_RESTART_MAP)
-
+    # TODO: Cache this on first call?
+    resource_map = deepcopy(BASE_RESOURCE_MAP)
     net_manager = network_manager()
 
     if (net_manager in ['FlatManager', 'FlatDHCPManager'] and
             config('multi-host').lower() == 'yes'):
-        _restart_map['/etc/nova/nova.conf'].extend(
+        resource_map['/etc/nova/nova.conf']['services'].extend(
             ['nova-api', 'nova-network']
         )
     elif net_manager == 'Quantum':
@@ -68,9 +84,28 @@ def restart_map():
         if plugin:
             conf = quantum_attribute(plugin, 'config')
             svcs = quantum_attribute(plugin, 'services')
-            _restart_map[conf] = svcs
-            _restart_map['/etc/quantum/quantum.conf'] = svcs
-    return _restart_map
+            ctxts = quantum_attribute(plugin, 'contexts') or []
+            resource_map[conf] = {}
+            resource_map[conf]['services'] = svcs
+            resource_map[conf]['contexts'] = ctxts
+            resource_map['/etc/quantum/quantum.conf'] = {
+                'services': svcs,
+                'contexts': ctxts
+            }
+    return resource_map
+
+def restart_map():
+    '''
+    Constructs a restart map based on charm config settings and relation
+    state.
+    '''
+    return {k: v['services'] for k, v in resource_map().iteritems()}
+
+def register_configs():
+    '''
+    Registers config files with their correpsonding context generators.
+    '''
+    pass
 
 
 def determine_packages():
@@ -95,10 +130,6 @@ def determine_packages():
 
         raise
     return packages
-
-
-def register_configs():
-    pass
 
 
 def migration_enabled():
@@ -139,11 +170,18 @@ def quantum_attribute(plugin, attr):
     except KeyError:
         log('Unrecognised plugin for quantum: %s' % plugin, level=ERROR)
         raise
-    return _plugin[attr]
-
+    try:
+        return _plugin[attr]
+    except KeyError:
+        return None
 
 def public_ssh_key(user='root'):
-    pass
+    home = pwd.getpwnam(user).pw_dir
+    try:
+        with open(os.path.join(home, '.ssh', 'id_rsa')) as key:
+            return key.read().strip()
+    except:
+        return None
 
 
 def initialize_ssh_keys():
