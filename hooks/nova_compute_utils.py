@@ -1,7 +1,9 @@
-
-from copy import copy, deepcopy
 import os
 import pwd
+
+from base64 import b64decode
+from copy import copy, deepcopy
+from subprocess import check_call
 
 from charmhelpers.core.hookenv import (
     config,
@@ -10,6 +12,10 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     relation_get,
     ERROR,
+)
+
+from charmhelpers.contrib.openstack.context import (
+    CA_CERT_PATH,
 )
 
 BASE_PACKAGES = [
@@ -188,9 +194,23 @@ def initialize_ssh_keys():
     pass
 
 
-def import_authorized_keys():
-    pass
+def import_authorized_keys(user='root'):
+    """Import SSH authorized_keys + known_hosts from a cloud-compute relation
+    and store in user's $HOME/.ssh.
+    """
+    # XXX: Should this be managed via templates + contexts?
+    hosts = relation_get('known_hosts')
+    auth_keys = relation_get('authorized_keys')
+    if None in [hosts, auth_keys]:
+        return
 
+    dest = os.path.join(pwd.getpwnam(user).pw_dir, '.ssh')
+    log('Saving new known_hosts and authorized_keys file to: %s.' % dest)
+
+    with open(os.path.join(dest, 'authorized_keys')) as _keys:
+        _keys.write(b64decode(auth_keys))
+    with open(os.path.join(dest, 'known_hosts')) as _hosts:
+        _hosts.write(b64decode(hosts))
 
 def configure_live_migration(configs=None):
     """
@@ -214,7 +234,16 @@ def do_openstack_upgrade():
 
 
 def import_keystone_ca_cert():
-    pass
+    """If provided, improt the Keystone CA cert that gets forwarded
+    to compute nodes via the cloud-compute interface
+    """
+    ca_cert = relation_get('ca_cert')
+    if not ca_cert:
+        return
+    log('Writing Keystone CA certificate to %s' % CA_CERT_PATH)
+    with open(CA_CERT_PATH) as out:
+        out.write(b64decode(ca_cert))
+    check_call(['update-ca-certificates'])
 
 
 def configure_network_service():

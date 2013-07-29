@@ -1,4 +1,4 @@
-from mock import patch
+from mock import patch, MagicMock, call
 
 from tests.test_utils import CharmTestCase, patch_open
 
@@ -142,18 +142,68 @@ class NovaComputeUtilsTests(CharmTestCase):
 
         self.assertEquals(ex, result)
 
+    def fake_user(self, username='foo'):
+        user = MagicMock()
+        user.pw_dir = '/home/' + username
+        return user
+
     @patch('__builtin__.open')
     @patch('pwd.getpwnam')
     def test_public_ssh_key_not_found(self, getpwnam, _open):
-        _open.side_effect = Exception 
-        getpwnam.pw_dir = '/home/foo'
+        _open.side_effect = Exception
+        getpwnam.return_value = self.fake_user('foo')
         self.assertEquals(None, utils.public_ssh_key())
-
 
     @patch('pwd.getpwnam')
     def test_public_ssh_key(self, getpwnam):
-        getpwnam.pw_dir = '/home/foo'
+        getpwnam.return_value = self.fake_user('foo')
         with patch_open() as (_open, _file):
             _file.read.return_value = 'mypubkey'
             result = utils.public_ssh_key('foo')
         self.assertEquals(result, 'mypubkey')
+
+    def test_import_authorized_keys_missing_data(self):
+        self.relation_get.return_value = None
+        with patch_open() as (_open, _file):
+            utils.import_authorized_keys(user='foo')
+            self.assertFalse(_open.called)
+
+    @patch('pwd.getpwnam')
+    def test_import_authorized_keys(self, getpwnam):
+        getpwnam.return_value = self.fake_user('foo')
+        self.relation_get.side_effect = [
+            'Zm9vX2tleQo=',  # relation_get('known_hosts')
+            'Zm9vX2hvc3QK',  # relation_get('authorized_keys')
+        ]
+
+        ex_open = [
+            call('/home/foo/.ssh/authorized_keys'),
+            call('/home/foo/.ssh/known_hosts')
+        ]
+        ex_write = [
+            call('foo_host\n'),
+            call('foo_key\n'),
+        ]
+
+        with patch_open() as (_open, _file):
+            utils.import_authorized_keys(user='foo')
+            self.assertEquals(ex_open, _open.call_args_list)
+            self.assertEquals(ex_write, _file.write.call_args_list)
+
+
+    @patch('subprocess.check_call')
+    def test_import_keystone_cert_missing_data(self, check_call):
+        self.relation_get.return_value = None
+        with patch_open() as (_open, _file):
+            utils.import_keystone_ca_cert()
+            self.assertFalse(_open.called)
+        self.assertFalse(check_call.called)
+
+    @patch.object(utils, 'check_call')
+    def test_import_keystone_cert(self, check_call):
+        self.relation_get.return_value = 'Zm9vX2NlcnQK'
+        with patch_open() as (_open, _file):
+            utils.import_keystone_ca_cert()
+            _open.assert_called_with(utils.CA_CERT_PATH)
+            _file.write.assert_called_with('foo_cert\n')
+        check_call.assert_called_with(['update-ca-certificates'])
