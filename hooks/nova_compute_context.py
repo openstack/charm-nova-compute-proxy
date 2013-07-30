@@ -1,7 +1,18 @@
-from charmhelpers.core.hookenv import unit_private_ip
 from charmhelpers.contrib.openstack import context
 
 from charmhelpers.core.host import apt_install, filter_installed_packages
+
+from charmhelpers.core.hookenv import (
+    config,
+    log,
+    relation_get,
+    relation_ids,
+    unit_private_ip,
+    ERROR,
+)
+
+from charmhelpers.contrib.openstack.utils import get_os_codename_package
+
 
 # This is just a label and it must be consistent across
 # nova-compute nodes to support live migration.
@@ -42,7 +53,7 @@ class CloudComputeContext(context.OSContextGenerator):
             return {}
         return {
             'network_manager': 'nova.network.manager.FlatDHCPManager',
-            'flat_interface': config_get('flat_interface'),
+            'flat_interface': config('flat_interface'),
             'ec2_host': ec2_host,
         }
 
@@ -84,13 +95,14 @@ class CloudComputeContext(context.OSContextGenerator):
         return vol_ctxt
 
     def __call__(self):
-        rids = relation_list('cloud-compute')
+        rids = relation_ids('cloud-compute')
         if not rids:
             return {}
 
         ctxt = {}
 
         net_manager = relation_get('network_manager').lower()
+        import ipdb; ipdb.set_trace() ############################## Breakpoint ##############################
         if net_manager == 'flatdhcpmanager':
             ctxt.update(self.flat_dhcp_context())
         elif net_manager == 'quantum':
@@ -122,7 +134,7 @@ class QuantumPluginContext(context.OSContextGenerator):
 
         ovs_ctxt = {
             # quantum.conf
-            'core_plugin': driver,
+            'core_plugin': q_driver,
             # nova.conf
             'libvirt_vif_driver': n_driver,
             'libvirt_use_virtio_for_bridges': True,
