@@ -7,6 +7,7 @@ import hooks.nova_compute_utils as utils
 
 TO_PATCH = [
     'config',
+    'get_os_codename_package',
     'log',
     'related_units',
     'relation_ids',
@@ -207,3 +208,34 @@ class NovaComputeUtilsTests(CharmTestCase):
             _open.assert_called_with(utils.CA_CERT_PATH)
             _file.write.assert_called_with('foo_cert\n')
         check_call.assert_called_with(['update-ca-certificates'])
+
+    @patch('charmhelpers.contrib.openstack.templating.OSConfigRenderer')
+    @patch.object(utils, 'quantum_enabled')
+    @patch.object(utils, 'resource_map')
+    def test_register_configs(self, resource_map, quantum, renderer):
+        quantum.return_value = False
+        self.get_os_codename_package.return_value = 'havana'
+        fake_renderer = MagicMock()
+        fake_renderer.register = MagicMock()
+        renderer.return_value = fake_renderer
+        ctxt1 = MagicMock()
+        ctxt2 = MagicMock()
+        rsc_map = {
+            '/etc/nova/nova.conf': {
+                'services': ['nova-compute'],
+                'contexts': [ctxt1],
+            },
+            '/etc/nova/nova-compute.conf': {
+                'services': ['nova-compute'],
+                'contexts': [ctxt2],
+            },
+        }
+        resource_map.return_value = rsc_map
+        utils.register_configs()
+        self.OSConfigRenderer.assert_called_with(openstack_release='havana',
+                                                 templates_dir='templates/')
+        ex_reg = [
+            call('/etc/nova/nova-compute.conf', [ctxt2]),
+            call('/etc/nova/nova.conf', [ctxt1])
+        ]
+        self.assertEquals(fake_renderer.register.call_args_list, ex_reg)

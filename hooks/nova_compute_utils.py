@@ -14,9 +14,20 @@ from charmhelpers.core.hookenv import (
     ERROR,
 )
 
-from charmhelpers.contrib.openstack.context import (
-    CA_CERT_PATH,
+from charmhelpers.contrib.openstack.utils import get_os_codename_package
+from charmhelpers.contrib.openstack import templating, context
+
+from nova_compute_contexts import (
+    CloudComputeContext,
+    NovaComputeVirtContext,
+    NovaComputeLibvirtContext,
+    NovaComputeCephContext,
+    QuantumPluginContext,
 )
+
+CA_CERT_PATH = '/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt'
+
+TEMPLATES='templates/'
 
 BASE_PACKAGES = [
     'nova-compute',
@@ -24,28 +35,46 @@ BASE_PACKAGES = [
 ]
 
 BASE_RESOURCE_MAP = {
+    '/etc/ceph/ceph.conf': {
+        'contexts': [NovaComputeCephContext()],
+        'services': [],
+    },
+    '/etc/ceph/secret.xml': {
+        'contexts': [NovaComputeCephContext()],
+        'services': [],
+    },
     '/etc/libvirt/qemu.conf': {
         'services': ['libvirt-bin'],
         'contexts': [],
     },
     '/etc/default/libvirt-bin': {
         'services': ['libvirt-bin'],
-        'contexts': [],
+        'contexts': [NovaComputeLibvirtContext()],
     },
     '/etc/nova/nova.conf': {
         'services': ['nova-compute'],
-        'contexts': [],
-    },
-    '/etc/nova/nova-compute.conf': {
-        'services': ['nova-compute'],
-        'contexts': [],
+        'contexts': [context.AMQPContext(),
+                     context.SharedDBContext(),
+                     context.ImageServiceContext(),
+                     CloudComputeContext(),
+                     NovaComputeCephContext(),
+                     QuantumPluginContext()]
     },
 }
 
 
+QUANTUM_RESOURCES = {
+    '/etc/quantum/quantum.conf': {
+        'services': ['quantum-server'],
+        'contexts': [context.AMQPContext()],
+    }
+}
+
 QUANTUM_PLUGINS = {
     'ovs': {
         'config': '/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini',
+        'contexts': [context.SharedDBContext(),
+                     QuantumPluginContext()],
         'services': ['quantum-plugin-openvswitch-agent'],
         'packages': ['quantum-plugin-openvswitch-agent',
                      'openvswitch-datapath-dkms'],
@@ -66,10 +95,6 @@ VIRT_TYPES = {
     'lxc': ['nova-compute-lxc'],
 }
 
-# This is just a label and it must be consistent across
-# nova-compute nodes to support live migration.
-CEPH_SECRET_UUID = '514c9fca-8cbe-11e2-9c52-3bc8c7819472'
-
 
 def resource_map():
     '''
@@ -87,6 +112,7 @@ def resource_map():
         )
     elif net_manager == 'Quantum':
         plugin = quantum_plugin()
+        resource_map.update(QUANTUM_RESOURCES)
         if plugin:
             conf = quantum_attribute(plugin, 'config')
             svcs = quantum_attribute(plugin, 'services')
@@ -94,10 +120,6 @@ def resource_map():
             resource_map[conf] = {}
             resource_map[conf]['services'] = svcs
             resource_map[conf]['contexts'] = ctxts
-            resource_map['/etc/quantum/quantum.conf'] = {
-                'services': svcs,
-                'contexts': ctxts
-            }
     return resource_map
 
 def restart_map():
@@ -109,9 +131,19 @@ def restart_map():
 
 def register_configs():
     '''
-    Registers config files with their correpsonding context generators.
+    Returns an OSTemplateRenderer object with all required configs registered.
     '''
-    pass
+    _resource_map = resource_map()
+    if quantum_enabled():
+        _resource_map.update(QUANTUM_RESOURCES)
+
+    release = get_os_codename_package('nova-common', fatal=False) or 'essex'
+    configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
+                                          openstack_release=release)
+
+    for cfg, d in _resource_map.iteritems():
+        configs.register(cfg, d['contexts'])
+    return configs
 
 
 def determine_packages():
