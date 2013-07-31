@@ -18,6 +18,16 @@ from charmhelpers.contrib.openstack.utils import get_os_codename_package
 # nova-compute nodes to support live migration.
 CEPH_SECRET_UUID = '514c9fca-8cbe-11e2-9c52-3bc8c7819472'
 
+
+def _save_flag_file(path, data):
+    '''
+    Saves local state about plugin or manager to specified file.
+    '''
+    # Wonder if we can move away from this now?
+    with open(path, 'wb') as out:
+        out.write(data)
+
+
 class NovaComputeLibvirtContext(context.OSContextGenerator):
     interfaces = []
 
@@ -119,6 +129,7 @@ class CloudComputeContext(context.OSContextGenerator):
                 ctxt.update(self.flat_dhcp_context())
             elif net_manager.lower() == 'quantum':
                 ctxt.update(self.quantum_context())
+            _save_flag_file(path='/etc/nova/nm.conf', data=net_manager)
 
         ctxt.update(self.volume_context())
         return ctxt
@@ -176,5 +187,8 @@ class QuantumPluginContext(context.OSContextGenerator):
 
         if plugin == 'ovs':
             ctxt.update(self.ovs_context())
+
+        _save_flag_file(path='/etc/nova/quantum_plugin.conf', data=plugin)
+
 
         return ctxt
