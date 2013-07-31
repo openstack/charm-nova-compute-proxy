@@ -38,7 +38,6 @@ TO_PATCH = [
     'import_authorized_keys',
     'import_keystone_ca_cert',
     'migration_enabled',
-    'configure_live_migration',
     'do_openstack_upgrade',
     'quantum_attribute',
     'quantum_enabled',
@@ -91,7 +90,6 @@ class NovaComputeRelationsTests(CharmTestCase):
         self.migration_enabled.return_value = False
         relations.config_changed()
         self.assertFalse(self.do_openstack_upgrade.called)
-        self.assertTrue(self.configure_live_migration)
         self.assertFalse(compute_joined.called)
 
     def test_amqp_joined(self):

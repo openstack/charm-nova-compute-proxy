@@ -65,7 +65,9 @@ class NovaComputeCephContext(context.CephContext):
 class CloudComputeContext(context.OSContextGenerator):
     '''
     Generates main context for writing nova.conf and quantum.conf templates
-    from a cloud-compute relation changed hook
+    from a cloud-compute relation changed hook.  Mainly used for determinig
+    correct network and volume service configuration on the compute node,
+    as advertised by the cloud-controller.
 
     Note: individual quantum plugin contexts are handled elsewhere.
     '''
@@ -138,14 +140,19 @@ class CloudComputeContext(context.OSContextGenerator):
 
         net_manager = relation_get('network_manager')
         if net_manager:
-            ctxt['network_manager'] = net_manager
             if net_manager.lower() == 'flatdhcpmanager':
-                ctxt.update(self.flat_dhcp_context())
+                ctxt.update({
+                    'network_manager_config': self.flat_dhcp_context()
+                })
             elif net_manager.lower() == 'quantum':
-                ctxt.update(self.quantum_context())
+                ctxt.update({
+                    'network_manager_config': self.quantum_context()
+                })
             _save_flag_file(path='/etc/nova/nm.conf', data=net_manager)
 
-        ctxt.update(self.volume_context())
+        vol_service = self.volume_context()
+        if vol_service:
+            ctxt.update({'volume_service_config': vol_service})
         return ctxt
 
 class QuantumPluginContext(context.OSContextGenerator):
@@ -168,6 +175,7 @@ class QuantumPluginContext(context.OSContextGenerator):
         n_fw_driver = 'nova.virt.firewall.NoopFirewallDriver'
 
         ovs_ctxt = {
+            'quantum_plugin': 'ovs',
             # quantum.conf
             'core_plugin': q_driver,
             # nova.conf
@@ -182,8 +190,8 @@ class QuantumPluginContext(context.OSContextGenerator):
 
         q_sec_groups = relation_get('quantum_security_groups')
         if q_sec_groups and q_sec_groups.lower() == 'yes':
+            ovs_ctxt['quantum_security_groups'] = True
             # nova.conf
-            ovs_ctxt['security_group_api'] = 'quantum'
             ovs_ctxt['nova_firewall_driver'] = n_fw_driver
             # ovs conf
             ovs_ctxt['ovs_firewall_driver'] = q_fw_driver

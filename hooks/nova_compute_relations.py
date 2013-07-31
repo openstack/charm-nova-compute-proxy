@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import sys
 
 from charmhelpers.core.hookenv import (
     Hooks,
@@ -10,6 +11,7 @@ from charmhelpers.core.hookenv import (
     relation_set,
     service_name,
     unit_get,
+    UnregisteredHookError,
 )
 
 from charmhelpers.core.host import (
@@ -27,8 +29,8 @@ from nova_compute_utils import (
     determine_packages,
     import_authorized_keys,
     import_keystone_ca_cert,
+    initialize_ssh_keys,
     migration_enabled,
-    configure_live_migration,
     do_openstack_upgrade,
     quantum_attribute,
     quantum_enabled,
@@ -59,10 +61,10 @@ def config_changed():
     if openstack_upgrade_available('nova-common'):
         do_openstack_upgrade()
 
-    configure_live_migration()
     if migration_enabled() and config('migration-auth-type') == 'ssh':
         # Check-in with nova-c-c and register new ssh key, if it has just been
         # generated.
+        initialize_ssh_keys()
         [compute_joined(rid) for rid in relation_ids('cloud-compute')]
 
     CONFIGS.write_all()
@@ -156,3 +158,14 @@ def ceph_changed():
     CONFIGS.write('/etc/ceph/ceph.conf')
     CONFIGS.write('/etc/ceph/secret.xml')
     CONFIGS.write('/etc/nova/nova.conf')
+
+
+def main():
+    try:
+        hooks.execute(sys.argv)
+    except UnregisteredHookError as e:
+        log('Unknown hook {} - skipping.'.format(e))
+
+
+if __name__ == '__main__':
+    main()

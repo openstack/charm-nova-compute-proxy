@@ -17,7 +17,7 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.contrib.openstack.utils import get_os_codename_package
 from charmhelpers.contrib.openstack import templating, context
 
-from nova_compute_contexts import (
+from nova_compute_context import (
     CloudComputeContext,
     NovaComputeLibvirtContext,
     NovaComputeCephContext,
@@ -34,14 +34,6 @@ BASE_PACKAGES = [
 ]
 
 BASE_RESOURCE_MAP = {
-    '/etc/ceph/ceph.conf': {
-        'contexts': [NovaComputeCephContext()],
-        'services': [],
-    },
-    '/etc/ceph/secret.xml': {
-        'contexts': [NovaComputeCephContext()],
-        'services': [],
-    },
     '/etc/libvirt/qemu.conf': {
         'services': ['libvirt-bin'],
         'contexts': [],
@@ -61,6 +53,16 @@ BASE_RESOURCE_MAP = {
     },
 }
 
+CEPH_RESOURCES = {
+    '/etc/ceph/ceph.conf': {
+        'contexts': [NovaComputeCephContext()],
+        'services': [],
+    },
+    '/etc/ceph/secret.xml': {
+        'contexts': [NovaComputeCephContext()],
+        'services': [],
+    }
+}
 
 QUANTUM_RESOURCES = {
     '/etc/quantum/quantum.conf': {
@@ -119,6 +121,10 @@ def resource_map():
             resource_map[conf] = {}
             resource_map[conf]['services'] = svcs
             resource_map[conf]['contexts'] = ctxts
+
+    if relation_ids('ceph'):
+        resource_map.update(CEPH_RESOURCES)
+
     return resource_map
 
 def restart_map():
@@ -170,11 +176,15 @@ def determine_packages():
 
 
 def migration_enabled():
-    return config('enable-live-migration').lower() == 'true'
+    # XXX: confirm juju-core bool behavior is the same.
+    return config('enable-live-migration')
 
 
 def quantum_enabled():
-    return config('network-manager').lower() == 'quantum'
+    manager = config('network-manager')
+    if not manager:
+        return False
+    return manager.lower() == 'quantum'
 
 
 def _network_config():
@@ -248,6 +258,8 @@ def configure_live_migration(configs=None):
     Ensure libvirt live migration is properly configured or disabled,
     depending on current config setting.
     """
+    # dont think we need this
+    return
     configs = configs or register_configs()
     configs.write('/etc/libvirt/libvirtd.conf')
     configs.write('/etc/default/libvirt-bin')
