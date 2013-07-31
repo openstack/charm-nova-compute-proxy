@@ -47,13 +47,21 @@ class CloudComputeContext(context.OSContextGenerator):
     '''
     interfaces = ['cloud-compute']
 
+    def _ensure_packages(self, packages):
+        '''Install but do not upgrade required packages'''
+        apt_install(filter_installed_packages(packages))
+
     def flat_dhcp_context(self):
         ec2_host = relation_get('ec2_host')
         if not ec2_host:
             return {}
+
+        if config('multi-host').lower() == 'yes':
+            self._ensure_packages(['nova-api', 'nova-network'])
+
         return {
             'network_manager': 'nova.network.manager.FlatDHCPManager',
-            'flat_interface': config('flat_interface'),
+            'flat_interface': config('flat-interface'),
             'ec2_host': ec2_host,
         }
 
@@ -69,7 +77,7 @@ class CloudComputeContext(context.OSContextGenerator):
             'quantum_security_groups': relation_get('quantum_security_groups'),
             'quantum_plugin': relation_get('quantum_plugin'),
         }
-        missing = [k for k, v in quantum_ctxt.iteritems() if k == None]
+        missing = [k for k, v in quantum_ctxt.iteritems() if v == None]
         if missing:
             log('Missing required relation settings for Quantum: ' +
                 ' '.join(missing))
@@ -79,10 +87,13 @@ class CloudComputeContext(context.OSContextGenerator):
                                         quantum_ctxt['auth_port'])
         quantum_ctxt['quantum_admin_auth_url'] = ks_url
         quantum_ctxt['network_api_class'] = 'nova.network.quantumv2.api.API'
+        return quantum_ctxt
 
     def volume_context(self):
-        vol_ctxt = {}
         vol_service = relation_get('volume_service')
+        if not vol_service:
+            return {}
+        vol_ctxt = {}
         if vol_service == 'cinder':
             vol_ctxt['volume_api_class'] = 'nova.volume.cinder.API'
         elif vol_service == 'nova-volume':
@@ -101,17 +112,16 @@ class CloudComputeContext(context.OSContextGenerator):
 
         ctxt = {}
 
-        net_manager = relation_get('network_manager').lower()
-        import ipdb; ipdb.set_trace() ############################## Breakpoint ##############################
-        if net_manager == 'flatdhcpmanager':
-            ctxt.update(self.flat_dhcp_context())
-        elif net_manager == 'quantum':
-            ctxt.update(self.quantum_context())
+        net_manager = relation_get('network_manager')
+        if net_manager:
+            ctxt['network_manager'] = net_manager
+            if net_manager.lower() == 'flatdhcpmanager':
+                ctxt.update(self.flat_dhcp_context())
+            elif net_manager.lower() == 'quantum':
+                ctxt.update(self.quantum_context())
 
-        vol_service = relation_get('volume_service')
-        if vol_service:
-            ctxt.update(self.volume_context())
-
+        ctxt.update(self.volume_context())
+        return ctxt
 
 class QuantumPluginContext(context.OSContextGenerator):
     interfaces = []
@@ -145,7 +155,8 @@ class QuantumPluginContext(context.OSContextGenerator):
             'local_ip': unit_private_ip(),
         }
 
-        if relation_get('quantum_security_groups').lower() == 'yes':
+        q_sec_groups = relation_get('quantum_security_groups')
+        if q_sec_groups and q_sec_groups.lower() == 'yes':
             ovs_ctxt['security_group_api'] = 'quantum'
             ovs_ctxt['nova_firewall_driver'] = n_fw_driver
             ovs_ctxt['ovs_firewall_driver'] = q_fw_driver
@@ -158,9 +169,12 @@ class QuantumPluginContext(context.OSContextGenerator):
         plugin = relation_get('quantum_plugin')
         if not plugin:
             return {}
-        self._ensure_pacakges(quantum_attribute(plugin, 'packages'))
+
+        self._ensure_packages(quantum_attribute(plugin, 'packages'))
 
         ctxt = {}
 
         if plugin == 'ovs':
             ctxt.update(self.ovs_context())
+
+        return ctxt
