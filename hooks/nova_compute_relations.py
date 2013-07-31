@@ -29,8 +29,6 @@ from nova_compute_utils import (
     import_keystone_ca_cert,
     migration_enabled,
     configure_live_migration,
-    configure_network_service,
-    configure_volume_service,
     do_openstack_upgrade,
     quantum_attribute,
     quantum_enabled,
@@ -66,6 +64,8 @@ def config_changed():
         # Check-in with nova-c-c and register new ssh key, if it has just been
         # generated.
         [compute_joined(rid) for rid in relation_ids('cloud-compute')]
+
+    CONFIGS.write_all()
 
 
 @hooks.hook('amqp-relation-joined')
@@ -128,8 +128,9 @@ def compute_joined(rid=None):
 @hooks.hook('cloud-compute-relation-changed')
 @restart_on_change(restart_map())
 def compute_changed():
-    configure_network_service()
-    configure_volume_service()
+    # rewriting all configs to pick up possible net or vol manager
+    # config advertised from controller.
+    CONFIGS.write_all()
     import_authorized_keys()
     import_keystone_ca_cert()
 

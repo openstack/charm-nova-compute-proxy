@@ -2,7 +2,7 @@ import os
 import pwd
 
 from base64 import b64decode
-from copy import copy, deepcopy
+from copy import deepcopy
 from subprocess import check_call
 
 from charmhelpers.core.hookenv import (
@@ -19,7 +19,6 @@ from charmhelpers.contrib.openstack import templating, context
 
 from nova_compute_contexts import (
     CloudComputeContext,
-    NovaComputeVirtContext,
     NovaComputeLibvirtContext,
     NovaComputeCephContext,
     QuantumPluginContext,
@@ -276,11 +275,3 @@ def import_keystone_ca_cert():
     with open(CA_CERT_PATH) as out:
         out.write(b64decode(ca_cert))
     check_call(['update-ca-certificates'])
-
-
-def configure_network_service():
-    pass
-
-
-def configure_volume_service():
-    pass

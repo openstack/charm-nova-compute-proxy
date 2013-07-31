@@ -29,16 +29,30 @@ def _save_flag_file(path, data):
 
 
 class NovaComputeLibvirtContext(context.OSContextGenerator):
+    '''
+    Determines various libvirt options depending on live migration
+    configuration.
+    '''
     interfaces = []
 
     def __call__(self):
-        pass
+
+        # enable tcp listening if configured for live migration.
+        migration = config('enable-live-migration')
+        if migration and migration.lower() == 'true':
+            opts = '-d -l'
+        else:
+            opts = '-d'
+        return {
+            'libvirtd_opts': opts,
+        }
 
 
 class NovaComputeVirtContext(context.OSContextGenerator):
     interfaces = []
     def __call__(self):
         return {}
+
 
 class NovaComputeCephContext(context.CephContext):
     def __call__(self):
@@ -72,7 +86,7 @@ class CloudComputeContext(context.OSContextGenerator):
         return {
             'network_manager': 'nova.network.manager.FlatDHCPManager',
             'flat_interface': config('flat-interface'),
-            'ec2_host': ec2_host,
+            'ec2_dmz_host': ec2_host,
         }
 
     def quantum_context(self):
@@ -168,8 +182,10 @@ class QuantumPluginContext(context.OSContextGenerator):
 
         q_sec_groups = relation_get('quantum_security_groups')
         if q_sec_groups and q_sec_groups.lower() == 'yes':
+            # nova.conf
             ovs_ctxt['security_group_api'] = 'quantum'
             ovs_ctxt['nova_firewall_driver'] = n_fw_driver
+            # ovs conf
             ovs_ctxt['ovs_firewall_driver'] = q_fw_driver
 
         return ovs_ctxt

@@ -39,8 +39,6 @@ TO_PATCH = [
     'import_keystone_ca_cert',
     'migration_enabled',
     'configure_live_migration',
-    'configure_network_service',
-    'configure_volume_service',
     'do_openstack_upgrade',
     'quantum_attribute',
     'quantum_enabled',
@@ -207,8 +205,6 @@ class NovaComputeRelationsTests(CharmTestCase):
     def test_compute_changed(self):
         relations.compute_changed()
         expected_funcs = [
-            self.configure_network_service,
-            self.configure_volume_service,
             self.import_authorized_keys,
             self.import_keystone_ca_cert,
         ]
