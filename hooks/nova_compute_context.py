@@ -94,7 +94,7 @@ class CloudComputeContext(context.OSContextGenerator):
         '''Install but do not upgrade required packages'''
         required = filter_installed_packages(packages)
         if required:
-            apt_install(required)
+            apt_install(required, fatal=True)
 
     def flat_dhcp_context(self):
         ec2_host = relation_get('ec2_host')
@@ -206,7 +206,7 @@ class QuantumPluginContext(context.OSContextGenerator):
         '''Install but do not upgrade required plugin packages'''
         required = filter_installed_packages(packages)
         if required:
-            apt_install(required)
+            apt_install(required, fatal=True)
 
     def ovs_context(self):
         q_driver = 'quantum.plugins.openvswitch.ovs_quantum_plugin.'\
