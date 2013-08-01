@@ -222,7 +222,7 @@ class NovaComputeRelationsTests(CharmTestCase):
         isdir.return_value = False
         hooks.ceph_joined()
         mkdir.assert_called_with('/etc/ceph')
-        self.apt_install.assert_called_with(['ceph-common'])
+        self.apt_install.assert_called_with(['ceph-common'], fatal=True)
 
     @patch.object(hooks, 'CONFIGS')
     def test_ceph_changed_missing_relation_data(self, configs):
