@@ -1,6 +1,6 @@
 from mock import patch, MagicMock, call
 
-from tests.test_utils import CharmTestCase, patch_open
+from unit_tests.test_utils import CharmTestCase, patch_open
 
 
 import hooks.nova_compute_utils as utils

@@ -1,6 +1,6 @@
 from mock import MagicMock
 from copy import deepcopy
-from tests.test_utils import CharmTestCase
+from unit_tests.test_utils import CharmTestCase
 
 import hooks.nova_compute_context as context
 
