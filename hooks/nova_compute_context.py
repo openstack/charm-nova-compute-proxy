@@ -9,6 +9,7 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     unit_private_ip,
     ERROR,
+    WARNING,
 )
 
 from charmhelpers.contrib.openstack.utils import get_os_codename_package
@@ -38,8 +39,7 @@ class NovaComputeLibvirtContext(context.OSContextGenerator):
     def __call__(self):
 
         # enable tcp listening if configured for live migration.
-        migration = config('enable-live-migration')
-        if migration and migration.lower() == 'true':
+        if config('enable-live-migration'):
             opts = '-d -l'
         else:
             opts = '-d'
@@ -75,7 +75,9 @@ class CloudComputeContext(context.OSContextGenerator):
 
     def _ensure_packages(self, packages):
         '''Install but do not upgrade required packages'''
-        apt_install(filter_installed_packages(packages))
+        required = filter_installed_packages(packages)
+        if required:
+            apt_install(required)
 
     def flat_dhcp_context(self):
         ec2_host = relation_get('ec2_host')
@@ -131,6 +133,7 @@ class CloudComputeContext(context.OSContextGenerator):
             raise
         return vol_ctxt
 
+
     def __call__(self):
         rids = relation_ids('cloud-compute')
         if not rids:
@@ -153,14 +156,40 @@ class CloudComputeContext(context.OSContextGenerator):
         vol_service = self.volume_context()
         if vol_service:
             ctxt.update({'volume_service_config': vol_service})
+
         return ctxt
+
+
+class OSConfigFlagContext(context.OSContextGenerator):
+        '''
+        Responsible adding user-defined config-flags in charm config to a
+        to a template context.
+        '''
+        # this can be moved to charm-helpers?
+        def __call__(self):
+            config_flags = config('config-flags')
+            if not config_flags:
+                return {}
+            config_flags = config_flags.split(',')
+            flags = {}
+            for flag in config_flags:
+                if '=' not in flag:
+                    log('Impoperly formatted config-flag, expected k=v '
+                        ' got %s' % flag, level=WARNING)
+                    continue
+                k, v = flag.split('=')
+                flags[k.strip()] = v
+            ctxt = {'user_config_flags': flags}
+            return ctxt
 
 class QuantumPluginContext(context.OSContextGenerator):
     interfaces = []
 
     def _ensure_packages(self, packages):
         '''Install but do not upgrade required plugin packages'''
-        apt_install(filter_installed_packages(packages))
+        required = filter_installed_packages(packages)
+        if required:
+            apt_install(required)
 
     def ovs_context(self):
         q_driver = 'quantum.plugins.openvswitch.ovs_quantum_plugin.'\

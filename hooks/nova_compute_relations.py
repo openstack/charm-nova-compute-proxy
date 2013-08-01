@@ -17,6 +17,7 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.core.host import (
     apt_install,
     apt_update,
+    filter_installed_packages,
     restart_on_change,
 )
 
@@ -142,7 +143,7 @@ def compute_changed():
 def ceph_joined():
     if not os.path.isdir('/etc/ceph'):
         os.mkdir('/etc/ceph')
-    apt_install('ceph-common')
+    apt_install(filter_installed_packages('ceph-common'))
 
 
 @hooks.hook('ceph-relation-changed')

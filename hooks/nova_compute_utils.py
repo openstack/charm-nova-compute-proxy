@@ -21,6 +21,7 @@ from nova_compute_context import (
     CloudComputeContext,
     NovaComputeLibvirtContext,
     NovaComputeCephContext,
+    OSConfigFlagContext,
     QuantumPluginContext,
 )
 
@@ -49,6 +50,7 @@ BASE_RESOURCE_MAP = {
                      context.ImageServiceContext(),
                      CloudComputeContext(),
                      NovaComputeCephContext(),
+                     OSConfigFlagContext(),
                      QuantumPluginContext()]
     },
 }
@@ -225,7 +227,7 @@ def quantum_attribute(plugin, attr):
 def public_ssh_key(user='root'):
     home = pwd.getpwnam(user).pw_dir
     try:
-        with open(os.path.join(home, '.ssh', 'id_rsa')) as key:
+        with open(os.path.join(home, '.ssh', 'id_rsa.pub')) as key:
             return key.read().strip()
     except:
         return None

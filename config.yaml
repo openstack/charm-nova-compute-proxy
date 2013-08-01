@@ -71,7 +71,6 @@ options:
     type: string
     description: Network interface on which to build bridge
   config-flags:
-    default: None
     type: string
     description: Comma separated list of key=value config flags to be set in nova.conf.
   nagios_context:

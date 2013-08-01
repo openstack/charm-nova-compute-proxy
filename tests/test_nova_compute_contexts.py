@@ -172,3 +172,27 @@ class NovaComputeContextTests(CharmTestCase):
         libvirt = context.NovaComputeLibvirtContext()
         self.assertEquals({'libvirtd_opts': '-d -l'}, libvirt())
 
+
+    def test_config_flag_context_none_set_in_config(self):
+        flags = context.OSConfigFlagContext()
+        self.assertEquals({}, flags())
+
+    def test_conflig_flag_context(self):
+        self.test_config.set('config-flags', 'one=two,three=four,five=six')
+        flags = context.OSConfigFlagContext()
+        ex = {
+            'user_config_flags': {
+                'one': 'two', 'three': 'four', 'five': 'six'
+            }
+        }
+        self.assertEquals(ex, flags())
+
+    def test_conflig_flag_context_filters_bad_input(self):
+        self.test_config.set('config-flags', 'one=two,threefour,five=six')
+        flags = context.OSConfigFlagContext()
+        ex = {
+            'user_config_flags': {
+                'one': 'two', 'five': 'six'
+            }
+        }
+        self.assertEquals(ex, flags())
