@@ -3,7 +3,7 @@ import pwd
 
 from base64 import b64decode
 from copy import deepcopy
-from subprocess import check_call
+from subprocess import check_call, check_output
 
 from charmhelpers.core.hookenv import (
     config,
@@ -27,7 +27,7 @@ from nova_compute_context import (
 
 CA_CERT_PATH = '/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt'
 
-TEMPLATES='templates/'
+TEMPLATES = 'templates/'
 
 BASE_PACKAGES = [
     'nova-compute',
@@ -38,6 +38,10 @@ BASE_RESOURCE_MAP = {
     '/etc/libvirt/qemu.conf': {
         'services': ['libvirt-bin'],
         'contexts': [],
+    },
+    '/etc/libvirt/libvirtd.conf': {
+        'services': ['libvirt-bin'],
+        'contexts': [NovaComputeLibvirtContext()],
     },
     '/etc/default/libvirt-bin': {
         'services': ['libvirt-bin'],
@@ -129,12 +133,14 @@ def resource_map():
 
     return resource_map
 
+
 def restart_map():
     '''
     Constructs a restart map based on charm config settings and relation
     state.
     '''
     return {k: v['services'] for k, v in resource_map().iteritems()}
+
 
 def register_configs():
     '''
@@ -224,6 +230,7 @@ def quantum_attribute(plugin, attr):
     except KeyError:
         return None
 
+
 def public_ssh_key(user='root'):
     home = pwd.getpwnam(user).pw_dir
     try:
@@ -233,8 +240,27 @@ def public_ssh_key(user='root'):
         return None
 
 
-def initialize_ssh_keys():
-    pass
+def initialize_ssh_keys(user='root'):
+    home_dir = pwd.getpwnam(user).pw_dir
+    ssh_dir = os.path.join(home_dir, '.ssh')
+    if not os.path.isdir(ssh_dir):
+        os.mkdir(ssh_dir)
+
+    priv_key = os.path.join(ssh_dir, 'id_rsa')
+    if not os.path.isfile(priv_key):
+        log('Generating new ssh key for user %s.' % user)
+        cmd = ['ssh-keygen', '-q', '-N', '', '-t', 'rsa', '-b', '2048',
+               '-f', priv_key]
+        check_output(cmd)
+
+    pub_key = '%s.pub' % priv_key
+    if not os.path.isfile(pub_key):
+        log('Generating missing ssh public key @ %s.' % pub_key)
+        cmd = ['ssh-keygen', '-y', '-f', priv_key]
+        p = check_output(cmd).strip()
+        with open(pub_key, 'wb') as out:
+            out.write(p)
+    check_output(['chown', '-R', user, ssh_dir])
 
 
 def import_authorized_keys(user='root'):
@@ -244,16 +270,19 @@ def import_authorized_keys(user='root'):
     # XXX: Should this be managed via templates + contexts?
     hosts = relation_get('known_hosts')
     auth_keys = relation_get('authorized_keys')
-    if None in [hosts, auth_keys]:
+    # XXX: Need to fix charm-helpers to return None for empty settings,
+    #      in all cases.
+    if not hosts or not auth_keys:
         return
 
     dest = os.path.join(pwd.getpwnam(user).pw_dir, '.ssh')
     log('Saving new known_hosts and authorized_keys file to: %s.' % dest)
 
-    with open(os.path.join(dest, 'authorized_keys')) as _keys:
+    with open(os.path.join(dest, 'authorized_keys'), 'wb') as _keys:
         _keys.write(b64decode(auth_keys))
-    with open(os.path.join(dest, 'known_hosts')) as _hosts:
+    with open(os.path.join(dest, 'known_hosts'), 'wb') as _hosts:
         _hosts.write(b64decode(hosts))
+
 
 def configure_live_migration(configs=None):
     """

@@ -182,8 +182,8 @@ class NovaComputeUtilsTests(CharmTestCase):
         ]
 
         ex_open = [
-            call('/home/foo/.ssh/authorized_keys'),
-            call('/home/foo/.ssh/known_hosts')
+            call('/home/foo/.ssh/authorized_keys', 'wb'),
+            call('/home/foo/.ssh/known_hosts', 'wb')
         ]
         ex_write = [
             call('foo_host\n'),
@@ -194,7 +194,6 @@ class NovaComputeUtilsTests(CharmTestCase):
             utils.import_authorized_keys(user='foo')
             self.assertEquals(ex_open, _open.call_args_list)
             self.assertEquals(ex_write, _file.write.call_args_list)
-
 
     @patch('subprocess.check_call')
     def test_import_keystone_cert_missing_data(self, check_call):
@@ -236,8 +235,8 @@ class NovaComputeUtilsTests(CharmTestCase):
         }
         resource_map.return_value = rsc_map
         utils.register_configs()
-        renderer.assert_called_with(openstack_release='havana',
-                                                 templates_dir='templates/')
+        renderer.assert_called_with(
+            openstack_release='havana', templates_dir='templates/')
         ex_reg = [
             call('/etc/nova/nova-compute.conf', [ctxt2]),
             call('/etc/nova/nova.conf', [ctxt1])

@@ -32,13 +32,13 @@ QUANTUM_CONTEXT = {
 # Context for an OVS plugin contains at least the following.  Other bits
 # (driver names) are dependent on OS release.
 BASE_QUANTUM_OVS_PLUGIN_CONTEXT = {
-    'core_plugin': 'quantum.plugins.openvswitch.ovs_quantum_plugin.'\
+    'core_plugin': 'quantum.plugins.openvswitch.ovs_quantum_plugin.'
                    'OVSQuantumPluginV2',
     'enable_tunneling': True,
     'libvirt_use_virtio_for_bridges': True,
     'local_ip': '10.0.0.1',
     'nova_firewall_driver': 'nova.virt.firewall.NoopFirewallDriver',
-    'ovs_firewall_driver': 'quantum.agent.linux.iptables_firewall.'\
+    'ovs_firewall_driver': 'quantum.agent.linux.iptables_firewall.'
                            'OVSHybridIptablesFirewallDriver',
     'tenant_network_type': 'gre',
     'tunnel_id_ranges': '1:1000',
@@ -46,9 +46,11 @@ BASE_QUANTUM_OVS_PLUGIN_CONTEXT = {
     'quantum_security_groups': True,
 }
 
+
 def fake_log(msg, level=None):
     level = level or 'INFO'
     print '[juju test log (%s)] %s' % (level, msg)
+
 
 class NovaComputeContextTests(CharmTestCase):
     def setUp(self):
@@ -88,7 +90,6 @@ class NovaComputeContextTests(CharmTestCase):
         }
         self.assertEquals(ex_ctxt, result)
 
-
     def test_cloud_compute_volume_context_nova_vol_unsupported(self):
         self.relation_ids.return_value = 'cloud-compute:0'
         cloud_compute = context.CloudComputeContext()
@@ -115,18 +116,19 @@ class NovaComputeContextTests(CharmTestCase):
     def test_cloud_compute_quantum_context(self):
         self.test_relation.set(QUANTUM_CONTEXT)
         cloud_compute = context.CloudComputeContext()
-        ex_ctxt = { 'network_manager_config': {
-            'auth_port': '5000',
-            'keystone_host': 'keystone_host',
-            'network_api_class': 'nova.network.quantumv2.api.API',
-            'quantum_admin_auth_url': 'http://keystone_host:5000/v2.0',
-            'quantum_admin_password': 'openstack',
-            'quantum_admin_tenant_name': 'admin',
-            'quantum_admin_username': 'admin',
-            'quantum_auth_strategy': 'keystone',
-            'quantum_plugin': 'ovs',
-            'quantum_security_groups': 'yes',
-            'quantum_url': 'http://quantum_url'
+        ex_ctxt = {
+            'network_manager_config': {
+                'auth_port': '5000',
+                'keystone_host': 'keystone_host',
+                'network_api_class': 'nova.network.quantumv2.api.API',
+                'quantum_admin_auth_url': 'http://keystone_host:5000/v2.0',
+                'quantum_admin_password': 'openstack',
+                'quantum_admin_tenant_name': 'admin',
+                'quantum_admin_username': 'admin',
+                'quantum_auth_strategy': 'keystone',
+                'quantum_plugin': 'ovs',
+                'quantum_security_groups': 'yes',
+                'quantum_url': 'http://quantum_url'
             }
         }
         self.assertEquals(ex_ctxt, cloud_compute())
@@ -163,15 +165,15 @@ class NovaComputeContextTests(CharmTestCase):
             path='/etc/nova/quantum_plugin.conf', data='ovs')
 
     def test_libvirt_bin_context_no_migration(self):
-        self.test_config.set('enable-live-migration', 'false')
+        self.test_config.set('enable-live-migration', False)
         libvirt = context.NovaComputeLibvirtContext()
-        self.assertEquals({'libvirtd_opts': '-d'}, libvirt())
+        self.assertEquals({'libvirtd_opts': '-d', 'listen_tls': 1}, libvirt())
 
     def test_libvirt_bin_context_migration_tcp_listen(self):
-        self.test_config.set('enable-live-migration', 'true')
+        self.test_config.set('enable-live-migration', True)
         libvirt = context.NovaComputeLibvirtContext()
-        self.assertEquals({'libvirtd_opts': '-d -l'}, libvirt())
-
+        self.assertEquals(
+            {'libvirtd_opts': '-d -l', 'listen_tls': 1}, libvirt())
 
     def test_config_flag_context_none_set_in_config(self):
         flags = context.OSConfigFlagContext()

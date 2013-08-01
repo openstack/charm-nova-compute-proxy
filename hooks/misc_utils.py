@@ -12,11 +12,13 @@ from charmhelpers.contrib.hahelpers.ceph import (
 )
 
 
-# This was pulled from cinder redux.  It should go somewhere common, charmhelpers.hahelpers.ceph?
+# This was pulled from cinder redux.  It should go somewhere common,
+# charmhelpers.hahelpers.ceph?
 
 def ensure_ceph_keyring(service):
     '''Ensures a ceph keyring exists.  Returns True if so, False otherwise'''
-    # TODO: This can be shared between cinder + glance, find a home for it.
+    # TODO: This can be shared between nova + glance + cinder, find a home for
+    # it.
     key = None
     for rid in relation_ids('ceph'):
         for unit in related_units(rid):
@@ -27,5 +29,5 @@ def ensure_ceph_keyring(service):
         return False
     ceph_create_keyring(service=service, key=key)
     keyring = ceph_keyring_path(service)
-    subprocess.check_call(['chown', 'cinder.cinder', keyring])
+    subprocess.check_call(['chown', 'nova.nova', keyring])
     return True

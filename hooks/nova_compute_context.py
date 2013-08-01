@@ -7,6 +7,7 @@ from charmhelpers.core.hookenv import (
     log,
     relation_get,
     relation_ids,
+    service_name,
     unit_private_ip,
     ERROR,
     WARNING,
@@ -37,19 +38,27 @@ class NovaComputeLibvirtContext(context.OSContextGenerator):
     interfaces = []
 
     def __call__(self):
+        # distro defaults
+        ctxt = {
+            # /etc/default/libvirt-bin
+            'libvirtd_opts': '-d',
+            # /etc/libvirt/libvirtd.conf (
+            'listen_tls': 1,
+        }
 
         # enable tcp listening if configured for live migration.
         if config('enable-live-migration'):
-            opts = '-d -l'
-        else:
-            opts = '-d'
-        return {
-            'libvirtd_opts': opts,
-        }
+            ctxt['libvirtd_opts'] += ' -l'
+
+        if config('migration-auth-type') in ['none', 'None', 'ssh']:
+            ctxt['listen_tls'] = 0
+
+        return ctxt
 
 
 class NovaComputeVirtContext(context.OSContextGenerator):
     interfaces = []
+
     def __call__(self):
         return {}
 
@@ -59,8 +68,16 @@ class NovaComputeCephContext(context.CephContext):
         ctxt = super(NovaComputeCephContext, self).__call__()
         if not ctxt:
             return {}
+        svc = service_name()
+        # secret.xml
         ctxt['ceph_secret_uuid'] = CEPH_SECRET_UUID
+        # nova.conf
+        ctxt['service_name'] = svc
+        ctxt['rbd_user'] = svc
+        ctxt['rbd_secret_uuid'] = CEPH_SECRET_UUID
+        ctxt['rbd_pool'] = 'nova'
         return ctxt
+
 
 class CloudComputeContext(context.OSContextGenerator):
     '''
@@ -105,7 +122,7 @@ class CloudComputeContext(context.OSContextGenerator):
             'quantum_security_groups': relation_get('quantum_security_groups'),
             'quantum_plugin': relation_get('quantum_plugin'),
         }
-        missing = [k for k, v in quantum_ctxt.iteritems() if v == None]
+        missing = [k for k, v in quantum_ctxt.iteritems() if v is None]
         if missing:
             log('Missing required relation settings for Quantum: ' +
                 ' '.join(missing))
@@ -132,7 +149,6 @@ class CloudComputeContext(context.OSContextGenerator):
                 vol_service, level=ERROR)
             raise
         return vol_ctxt
-
 
     def __call__(self):
         rids = relation_ids('cloud-compute')
@@ -182,6 +198,7 @@ class OSConfigFlagContext(context.OSContextGenerator):
             ctxt = {'user_config_flags': flags}
             return ctxt
 
+
 class QuantumPluginContext(context.OSContextGenerator):
     interfaces = []
 
@@ -194,8 +211,8 @@ class QuantumPluginContext(context.OSContextGenerator):
     def ovs_context(self):
         q_driver = 'quantum.plugins.openvswitch.ovs_quantum_plugin.'\
                    'OVSQuantumPluginV2'
-        q_fw_driver  = 'quantum.agent.linux.iptables_firewall.'\
-                       'OVSHybridIptablesFirewallDriver'
+        q_fw_driver = 'quantum.agent.linux.iptables_firewall.'\
+                      'OVSHybridIptablesFirewallDriver'
 
         if get_os_codename_package('nova-common') in ['essex', 'folsom']:
             n_driver = 'nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver'
@@ -242,6 +259,5 @@ class QuantumPluginContext(context.OSContextGenerator):
             ctxt.update(self.ovs_context())
 
         _save_flag_file(path='/etc/nova/quantum_plugin.conf', data=plugin)
-
 
         return ctxt

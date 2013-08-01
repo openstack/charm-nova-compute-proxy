@@ -1,3 +1,8 @@
+###############################################################################
+# [ WARNING ]
+# Configuration file maintained by Juju. Local changes may be overwritten.
+###############################################################################
+
 # Defaults for libvirt-bin initscript (/etc/init.d/libvirt-bin)
 # This is a POSIX shell fragment
 

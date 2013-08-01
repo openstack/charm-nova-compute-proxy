@@ -27,6 +27,7 @@ TO_PATCH = [
     # charmhelpers.core.host
     'apt_install',
     'apt_update',
+    'filter_installed_packages',
     'restart_on_change',
     #charmhelpers.contrib.openstack.utils
     'configure_installation_source',
@@ -37,6 +38,7 @@ TO_PATCH = [
     'determine_packages',
     'import_authorized_keys',
     'import_keystone_ca_cert',
+    'initialize_ssh_keys',
     'migration_enabled',
     'do_openstack_upgrade',
     'quantum_attribute',
@@ -49,11 +51,16 @@ TO_PATCH = [
 ]
 
 
+def fake_filter(packages):
+    return packages
+
+
 class NovaComputeRelationsTests(CharmTestCase):
     def setUp(self):
         super(NovaComputeRelationsTests, self).setUp(relations,
                                                      TO_PATCH)
         self.config.side_effect = self.test_config.get
+        self.filter_installed_packages.side_effect = fake_filter
 
     def test_install_hook(self):
         repo = 'cloud:precise-grizzly'
@@ -215,7 +222,7 @@ class NovaComputeRelationsTests(CharmTestCase):
         isdir.return_value = False
         relations.ceph_joined()
         mkdir.assert_called_with('/etc/ceph')
-        self.apt_install.assert_called_with('ceph-common')
+        self.apt_install.assert_called_with(['ceph-common'])
 
     @patch.object(relations, 'CONFIGS')
     def test_ceph_changed_missing_relation_data(self, configs):

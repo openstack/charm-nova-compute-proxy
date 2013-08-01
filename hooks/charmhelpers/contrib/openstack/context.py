@@ -153,7 +153,7 @@ class CephContext(OSContextGenerator):
 
     def __call__(self):
         '''This generates context for /etc/ceph/ceph.conf templates'''
-        log('Generating tmeplate context for ceph')
+        log('Generating template context for ceph')
         mon_hosts = []
         auth = None
         for rid in relation_ids('ceph'):
