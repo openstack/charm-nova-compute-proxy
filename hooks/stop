@@ -1,1 +1,1 @@
-nova_compute_relations.py
+nova_compute_hooks.py
