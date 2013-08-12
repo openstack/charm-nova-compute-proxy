@@ -13,13 +13,9 @@ from charmhelpers.core.hookenv import (
     relation_get,
 )
 
-from charmhelpers.contrib.openstack.neutron import (
-    neutron_plugin_attribute,
-    neutron_plugins,
-    quantum_plugins,
-)
+from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 
-from charmhelpers.contrib.openstack.utils import get_os_codename_package
+from charmhelpers.contrib.openstack.utils import os_release
 from charmhelpers.contrib.openstack import templating, context
 
 from nova_compute_context import (
@@ -117,9 +113,9 @@ def resource_map():
 
     if net_manager in ['neutron', 'quantum']:
         if net_manager == 'quantum':
-            resource_map.update(quantum_plugins())
+            resource_map.update(QUANTUM_RESOURCES)
         if net_manager == 'neutron':
-            resource_map.update(neutron_plugins())
+            resource_map.update(NEUTRON_RESOURCES)
 
         plugin = neutron_plugin()
         if plugin:
@@ -149,18 +145,11 @@ def register_configs():
     '''
     Returns an OSTemplateRenderer object with all required configs registered.
     '''
-    _resource_map = resource_map()
-    net_manager = network_manager()
-    if net_manager == 'quantum':
-        _resource_map.update(QUANTUM_RESOURCES)
-    elif net_manager == 'neutron':
-        _resource_map.update(NEUTRON_RESOURCES)
-
-    release = get_os_codename_package('nova-common', fatal=False) or 'essex'
+    release = os_release('nova-common')
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
 
-    for cfg, d in _resource_map.iteritems():
+    for cfg, d in resource_map().iteritems():
         configs.register(cfg, d['contexts'])
     return configs
 
