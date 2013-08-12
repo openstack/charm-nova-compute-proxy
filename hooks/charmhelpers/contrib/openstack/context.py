@@ -6,6 +6,12 @@ from subprocess import (
     check_call
 )
 
+
+from charmhelpers.core.host import (
+    apt_install,
+    filter_installed_packages,
+)
+
 from charmhelpers.core.hookenv import (
     config,
     local_unit,
@@ -14,6 +20,7 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     related_units,
     unit_get,
+    unit_private_ip,
 )
 
 from charmhelpers.contrib.hahelpers.cluster import (
@@ -27,6 +34,11 @@ from charmhelpers.contrib.hahelpers.cluster import (
 from charmhelpers.contrib.hahelpers.apache import (
     get_cert,
     get_ca_cert,
+)
+
+from charmhelpers.contrib.openstack.neutron import (
+    network_manager,
+    neutron_plugin_attribute,
 )
 
 CA_CERT_PATH = '/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt'
@@ -57,26 +69,39 @@ class OSContextGenerator(object):
 class SharedDBContext(OSContextGenerator):
     interfaces = ['shared-db']
 
+    def __init__(self, database=None, user=None, relation_prefix=None):
+        '''
+        Allows inspecting relation for settings prefixed with relation_prefix.
+        This is useful for parsing access for multiple databases returned via
+        the shared-db interface (eg, nova_password, quantum_password)
+        '''
+        self.relation_prefix = relation_prefix
+        self.database = database
+        self.user = user
+
     def __call__(self):
-        log('Generating template context for shared-db')
-        conf = config()
-        try:
-            database = conf['database']
-            username = conf['database-user']
-        except KeyError as e:
+        self.database = self.database or config('database')
+        self.user = self.user or config('database-user')
+        if None in [self.database, self.user]:
             log('Could not generate shared_db context. '
-                'Missing required charm config options: %s.' % e)
+                'Missing required charm config options. '
+                '(database name and user)')
             raise OSContextError
         ctxt = {}
+
+        password_setting = 'password'
+        if self.relation_prefix:
+            password_setting = self.relation_prefix + '_password'
+
         for rid in relation_ids('shared-db'):
             for unit in related_units(rid):
+                passwd = relation_get(password_setting, rid=rid, unit=unit)
                 ctxt = {
                     'database_host': relation_get('db_host', rid=rid,
                                                   unit=unit),
-                    'database': database,
-                    'database_user': username,
-                    'database_password': relation_get('password', rid=rid,
-                                                      unit=unit)
+                    'database': self.database,
+                    'database_user': self.user,
+                    'database_password': passwd,
                 }
         if not context_complete(ctxt):
             return {}
@@ -153,7 +178,7 @@ class CephContext(OSContextGenerator):
 
     def __call__(self):
         '''This generates context for /etc/ceph/ceph.conf templates'''
-        log('Generating template context for ceph')
+        log('Generating tmeplate context for ceph')
         mon_hosts = []
         auth = None
         for rid in relation_ids('ceph'):
@@ -207,7 +232,7 @@ class HAProxyContext(OSContextGenerator):
 
 
 class ImageServiceContext(OSContextGenerator):
-    interfaces = ['image-service']
+    interfaces = ['image-servce']
 
     def __call__(self):
         '''
@@ -291,4 +316,85 @@ class ApacheSSLContext(OSContextGenerator):
                 int_port = determine_api_port(ext_port)
             portmap = (int(ext_port), int(int_port))
             ctxt['endpoints'].append(portmap)
+        return ctxt
+
+
+class NeutronContext(object):
+    interfaces = []
+
+    @property
+    def plugin(self):
+        return None
+
+    @property
+    def network_manager(self):
+        return None
+
+    @property
+    def packages(self):
+        return neutron_plugin_attribute(self.plugin, 'packages')
+
+    @property
+    def neutron_security_groups(self):
+        return None
+
+    def _ensure_packages(self):
+        '''Install but do not upgrade required plugin packages'''
+        required = filter_installed_packages(self.packages)
+        if required:
+            apt_install(required, fatal=True)
+
+    def _save_flag_file(self):
+        if self.network_manager == 'quantum':
+            _file = '/etc/nova/quantum_plugin.conf'
+        else:
+            _file = '/etc/nova/neutron_plugin.conf'
+        with open(_file, 'wb') as out:
+            out.write(self.plugin + '\n')
+
+    def ovs_ctxt(self):
+        ovs_ctxt = {
+            'neutron_plugin': 'ovs',
+            # quantum.conf
+            'core_plugin': neutron_plugin_attribute(self.plugin, 'driver'),
+            # NOTE: network api class in template for each release.
+            # nova.conf
+            #'libvirt_vif_driver': n_driver,
+            #'libvirt_use_virtio_for_bridges': True,
+            # ovs config
+            'local_ip': unit_private_ip(),
+        }
+
+        if self.neutron_security_groups:
+            ovs_ctxt['neutron_security_groups'] = True
+
+            fw_driver = ('%s.agent.linux.iptables_firewall.'
+                         'OVSHybridIptablesFirewallDriver' %
+                         self.network_manager)
+
+            ovs_ctxt.update({
+                # IN TEMPLATE:
+                #   - security_group_api=quantum in nova.conf for >= g
+                #  nova_firewall_driver=nova.virt.firewall.NoopFirewallDriver'
+                'neutron_firewall_driver': fw_driver,
+            })
+
+        return ovs_ctxt
+
+    def __call__(self):
+
+        if self.network_manager not in ['quantum', 'neutron']:
+            return {}
+
+        if not self.plugin:
+            return {}
+
+        self._ensure_packages()
+
+        ctxt = {'network_manager': self.network_manager}
+
+        if self.plugin == 'ovs':
+            ctxt.update(self.ovs_ctxt())
+
+        self._save_flag_file()
         return ctxt

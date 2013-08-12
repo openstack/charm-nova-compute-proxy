@@ -26,16 +26,17 @@ from charmhelpers.contrib.openstack.utils import (
     openstack_upgrade_available,
 )
 
+from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
+
 from nova_compute_utils import (
     determine_packages,
     import_authorized_keys,
     import_keystone_ca_cert,
     initialize_ssh_keys,
     migration_enabled,
+    network_manager,
+    neutron_plugin,
     do_openstack_upgrade,
-    quantum_attribute,
-    quantum_enabled,
-    quantum_plugin,
     public_ssh_key,
     restart_map,
     register_configs,
@@ -84,8 +85,10 @@ def amqp_changed():
         log('amqp relation incomplete. Peer not ready?')
         return
     CONFIGS.write('/etc/nova/nova.conf')
-    if quantum_enabled():
+    if network_manager() == 'quantum':
         CONFIGS.write('/etc/quantum/quantum.conf')
+    if network_manager() == 'neutron':
+        CONFIGS.write('/etc/neutron/neutron.conf')
 
 
 @hooks.hook('shared-db-relation-joined')
@@ -101,9 +104,10 @@ def db_changed():
         log('shared-db relation incomplete. Peer not ready?')
         return
     CONFIGS.write('/etc/nova/nova.conf')
-    if quantum_enabled():
-        plugin = quantum_plugin()
-        CONFIGS.write(quantum_attribute(plugin, 'config'))
+    nm = network_manager()
+    if nm in ['quantum', 'neutron']:
+        plugin = neutron_plugin()
+        CONFIGS.write(neutron_plugin_attribute(plugin, 'config', nm))
 
 
 @hooks.hook('image-service-relation-changed')

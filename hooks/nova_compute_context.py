@@ -8,12 +8,11 @@ from charmhelpers.core.hookenv import (
     relation_get,
     relation_ids,
     service_name,
-    unit_private_ip,
     ERROR,
     WARNING,
 )
 
-from charmhelpers.contrib.openstack.utils import get_os_codename_package
+from charmhelpers.contrib.openstack.utils import os_release
 
 
 # This is just a label and it must be consistent across
@@ -142,7 +141,7 @@ class CloudComputeContext(context.OSContextGenerator):
         if vol_service == 'cinder':
             vol_ctxt['volume_api_class'] = 'nova.volume.cinder.API'
         elif vol_service == 'nova-volume':
-            if get_os_codename_package('nova-common') in ['essex', 'folsom']:
+            if os_release('nova-common') in ['essex', 'folsom']:
                 vol_ctxt['volume_api_class'] = 'nova.volume.api.API'
         else:
             log('Invalid volume service received via cloud-compute: %s' %
@@ -190,7 +189,7 @@ class OSConfigFlagContext(context.OSContextGenerator):
             flags = {}
             for flag in config_flags:
                 if '=' not in flag:
-                    log('Impoperly formatted config-flag, expected k=v '
+                    log('Improperly formatted config-flag, expected k=v '
                         ' got %s' % flag, level=WARNING)
                     continue
                 k, v = flag.split('=')
@@ -199,65 +198,32 @@ class OSConfigFlagContext(context.OSContextGenerator):
             return ctxt
 
 
-class QuantumPluginContext(context.OSContextGenerator):
+class NeutronComputeContext(context.NeutronContext):
     interfaces = []
 
-    def _ensure_packages(self, packages):
-        '''Install but do not upgrade required plugin packages'''
-        required = filter_installed_packages(packages)
-        if required:
-            apt_install(required, fatal=True)
+    @property
+    def plugin(self):
+        from nova_compute_utils import neutron_plugin
+        return neutron_plugin()
 
-    def ovs_context(self):
-        q_driver = 'quantum.plugins.openvswitch.ovs_quantum_plugin.'\
-                   'OVSQuantumPluginV2'
-        q_fw_driver = 'quantum.agent.linux.iptables_firewall.'\
-                      'OVSHybridIptablesFirewallDriver'
+    @property
+    def network_manager(self):
+        from nova_compute_utils import network_manager as manager
+        return manager()
 
-        if get_os_codename_package('nova-common') in ['essex', 'folsom']:
+    @property
+    def neutron_security_groups(self):
+        groups = [relation_get('neutron_security_groups'),
+                  relation_get('quantum_security_groups')]
+        return ('yes' in groups or 'Yes' in groups)
+
+    def ovs_ctxt(self):
+        ctxt = super(NeutronComputeContext, self).ovs_ctxt()
+        if os_release('nova-common') == 'folsom':
             n_driver = 'nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver'
         else:
             n_driver = 'nova.virt.libvirt.vif.LibvirtGenericVIFDriver'
-        n_fw_driver = 'nova.virt.firewall.NoopFirewallDriver'
-
-        ovs_ctxt = {
-            'quantum_plugin': 'ovs',
-            # quantum.conf
-            'core_plugin': q_driver,
-            # nova.conf
+        ctxt.update({
             'libvirt_vif_driver': n_driver,
-            'libvirt_use_virtio_for_bridges': True,
-            # ovs config
-            'tenant_network_type': 'gre',
-            'enable_tunneling': True,
-            'tunnel_id_ranges': '1:1000',
-            'local_ip': unit_private_ip(),
-        }
-
-        q_sec_groups = relation_get('quantum_security_groups')
-        if q_sec_groups and q_sec_groups.lower() == 'yes':
-            ovs_ctxt['quantum_security_groups'] = True
-            # nova.conf
-            ovs_ctxt['nova_firewall_driver'] = n_fw_driver
-            # ovs conf
-            ovs_ctxt['ovs_firewall_driver'] = q_fw_driver
-
-        return ovs_ctxt
-
-    def __call__(self):
-        from nova_compute_utils import quantum_attribute
-
-        plugin = relation_get('quantum_plugin')
-        if not plugin:
-            return {}
-
-        self._ensure_packages(quantum_attribute(plugin, 'packages'))
-
-        ctxt = {}
-
-        if plugin == 'ovs':
-            ctxt.update(self.ovs_context())
-
-        _save_flag_file(path='/etc/nova/quantum_plugin.conf', data=plugin)
-
+        })
         return ctxt

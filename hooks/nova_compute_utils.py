@@ -11,7 +11,12 @@ from charmhelpers.core.hookenv import (
     related_units,
     relation_ids,
     relation_get,
-    ERROR,
+)
+
+from charmhelpers.contrib.openstack.neutron import (
+    neutron_plugin_attribute,
+    neutron_plugins,
+    quantum_plugins,
 )
 
 from charmhelpers.contrib.openstack.utils import get_os_codename_package
@@ -22,7 +27,7 @@ from nova_compute_context import (
     NovaComputeLibvirtContext,
     NovaComputeCephContext,
     OSConfigFlagContext,
-    QuantumPluginContext,
+    NeutronComputeContext,
 )
 
 CA_CERT_PATH = '/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt'
@@ -55,7 +60,7 @@ BASE_RESOURCE_MAP = {
                      CloudComputeContext(),
                      NovaComputeCephContext(),
                      OSConfigFlagContext(),
-                     QuantumPluginContext()]
+                     NeutronComputeContext()]
     },
 }
 
@@ -77,21 +82,13 @@ QUANTUM_RESOURCES = {
     }
 }
 
-QUANTUM_PLUGINS = {
-    'ovs': {
-        'config': '/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini',
-        'contexts': [context.SharedDBContext(),
-                     QuantumPluginContext()],
-        'services': ['quantum-plugin-openvswitch-agent'],
-        'packages': ['quantum-plugin-openvswitch-agent',
-                     'openvswitch-datapath-dkms'],
-    },
-    'nvp': {
-        'config': '/etc/quantum/plugins/nicira/nvp.ini',
-        'services': [],
-        'packages': ['quantum-plugin-nicira'],
+NEUTRON_RESOURCES = {
+    '/etc/neutron/neutron.conf': {
+        'services': ['neutron-server'],
+        'contexts': [context.AMQPContext()],
     }
 }
+
 
 # Maps virt-type config to a compute package(s).
 VIRT_TYPES = {
@@ -112,18 +109,24 @@ def resource_map():
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     net_manager = network_manager()
 
-    if (net_manager in ['FlatManager', 'FlatDHCPManager'] and
+    if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
             config('multi-host').lower() == 'yes'):
         resource_map['/etc/nova/nova.conf']['services'].extend(
             ['nova-api', 'nova-network']
         )
-    elif net_manager == 'Quantum':
-        plugin = quantum_plugin()
-        resource_map.update(QUANTUM_RESOURCES)
+
+    if net_manager in ['neutron', 'quantum']:
+        if net_manager == 'quantum':
+            resource_map.update(quantum_plugins())
+        if net_manager == 'neutron':
+            resource_map.update(neutron_plugins())
+
+        plugin = neutron_plugin()
         if plugin:
-            conf = quantum_attribute(plugin, 'config')
-            svcs = quantum_attribute(plugin, 'services')
-            ctxts = quantum_attribute(plugin, 'contexts') or []
+            conf = neutron_plugin_attribute(plugin, 'config', net_manager)
+            svcs = neutron_plugin_attribute(plugin, 'services', net_manager)
+            ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
+                     or [])
             resource_map[conf] = {}
             resource_map[conf]['services'] = svcs
             resource_map[conf]['contexts'] = ctxts
@@ -147,8 +150,11 @@ def register_configs():
     Returns an OSTemplateRenderer object with all required configs registered.
     '''
     _resource_map = resource_map()
-    if quantum_enabled():
+    net_manager = network_manager()
+    if net_manager == 'quantum':
         _resource_map.update(QUANTUM_RESOURCES)
+    elif net_manager == 'neutron':
+        _resource_map.update(NEUTRON_RESOURCES)
 
     release = get_os_codename_package('nova-common', fatal=False) or 'essex'
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
@@ -163,12 +169,13 @@ def determine_packages():
     packages = [] + BASE_PACKAGES
 
     net_manager = network_manager()
-    if (net_manager in ['FlatManager', 'FlatDHCPManager'] and
+    if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
             config('multi-host').lower() == 'yes'):
         packages.extend(['nova-api', 'nova-network'])
-    elif net_manager == 'Quantum':
-        plugin = quantum_plugin()
-        packages.extend(quantum_attribute(plugin, 'packages'))
+    elif net_manager == 'quantum':
+        plugin = neutron_plugin()
+        packages.extend(
+            neutron_plugin_attribute(plugin, 'packages', net_manager))
 
     if relation_ids('ceph'):
         packages.append('ceph-common')
@@ -200,7 +207,7 @@ def _network_config():
     Obtain all relevant network configuration settings from nova-c-c via
     cloud-compute interface.
     '''
-    settings = ['network_manager', 'quantum_plugin']
+    settings = ['network_manager', 'neutron_plugin', 'quantum_plugin']
     net_config = {}
     for rid in relation_ids('cloud-compute'):
         for unit in related_units(rid):
@@ -211,24 +218,16 @@ def _network_config():
     return net_config
 
 
-def quantum_plugin():
-    return _network_config().get('quantum_plugin')
+def neutron_plugin():
+    return (_network_config().get('quantum_plugin') or
+            _network_config().get('quantum_plugin'))
 
 
 def network_manager():
-    return _network_config().get('network_manager')
-
-
-def quantum_attribute(plugin, attr):
-    try:
-        _plugin = QUANTUM_PLUGINS[plugin]
-    except KeyError:
-        log('Unrecognised plugin for quantum: %s' % plugin, level=ERROR)
-        raise
-    try:
-        return _plugin[attr]
-    except KeyError:
-        return None
+    manager = _network_config().get('network_manager')
+    if manager:
+        manager = manager.lower()
+    return manager
 
 
 def public_ssh_key(user='root'):
