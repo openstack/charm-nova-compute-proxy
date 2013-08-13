@@ -25,8 +25,31 @@ def _save_flag_file(path, data):
     Saves local state about plugin or manager to specified file.
     '''
     # Wonder if we can move away from this now?
+    if data is None:
+        return
     with open(path, 'wb') as out:
         out.write(data)
+
+
+# compatability functions to help with quantum -> neutron transition
+def _network_manager():
+    from nova_compute_utils import network_manager as manager
+    return manager()
+
+
+def _neutron_security_groups():
+        groups = [relation_get('neutron_security_groups'),
+                  relation_get('quantum_security_groups')]
+        return ('yes' in groups or 'Yes' in groups)
+
+
+def _neutron_plugin():
+        from nova_compute_utils import neutron_plugin
+        return neutron_plugin()
+
+
+def _neutron_url():
+        return relation_get('neutron_url') or relation_get('quantum_url')
 
 
 class NovaComputeLibvirtContext(context.OSContextGenerator):
@@ -95,6 +118,14 @@ class CloudComputeContext(context.OSContextGenerator):
         if required:
             apt_install(required, fatal=True)
 
+    @property
+    def network_manager(self):
+        return _network_manager()
+
+    @property
+    def volume_service(self):
+        return relation_get('volume_service')
+
     def flat_dhcp_context(self):
         ec2_host = relation_get('ec2_host')
         if not ec2_host:
@@ -104,50 +135,92 @@ class CloudComputeContext(context.OSContextGenerator):
             self._ensure_packages(['nova-api', 'nova-network'])
 
         return {
-            'network_manager': 'nova.network.manager.FlatDHCPManager',
             'flat_interface': config('flat-interface'),
             'ec2_dmz_host': ec2_host,
         }
 
-    def quantum_context(self):
-        quantum_ctxt = {
-            'quantum_auth_strategy': 'keystone',
-            'keystone_host': relation_get('keystone_host'),
+    def neutron_context(self):
+        # generate config context for neutron or quantum. these get converted
+        # directly into flags in nova.conf
+        # NOTE: Its up to release templates to set correct driver
+        def _legacy_quantum(ctxt):
+            renamed = {}
+            for k, v in ctxt.iteritems():
+                k = k.replace('neutron', 'quantum')
+                renamed[k] = v
+            return renamed
+
+        neutron_ctxt = {
+            'neutron_auth_strategy': 'keystone',
+            'keystone_host': relation_get('auth_host'),
             'auth_port': relation_get('auth_port'),
-            'quantum_url': relation_get('quantum_url'),
-            'quantum_admin_tenant_name': relation_get('service_tenant'),
-            'quantum_admin_username': relation_get('service_username'),
-            'quantum_admin_password': relation_get('service_password'),
-            'quantum_security_groups': relation_get('quantum_security_groups'),
-            'quantum_plugin': relation_get('quantum_plugin'),
+            'neutron_admin_tenant_name': relation_get('service_tenant_name'),
+            'neutron_admin_username': relation_get('service_username'),
+            'neutron_admin_password': relation_get('service_password'),
+            'neutron_plugin': _neutron_plugin(),
+            'neutron_url': _neutron_url(),
         }
-        missing = [k for k, v in quantum_ctxt.iteritems() if v is None]
+        missing = [k for k, v in neutron_ctxt.iteritems() if v in ['', None]]
         if missing:
             log('Missing required relation settings for Quantum: ' +
                 ' '.join(missing))
             return {}
 
-        ks_url = 'http://%s:%s/v2.0' % (quantum_ctxt['keystone_host'],
-                                        quantum_ctxt['auth_port'])
-        quantum_ctxt['quantum_admin_auth_url'] = ks_url
-        quantum_ctxt['network_api_class'] = 'nova.network.quantumv2.api.API'
-        return quantum_ctxt
+        neutron_ctxt['neutron_security_groups'] = _neutron_security_groups()
+
+        ks_url = 'http://%s:%s/v2.0' % (neutron_ctxt['keystone_host'],
+                                        neutron_ctxt['auth_port'])
+        neutron_ctxt['neutron_admin_auth_url'] = ks_url
+
+        if self.network_manager == 'quantum':
+            return _legacy_quantum(neutron_ctxt)
+
+        return neutron_ctxt
 
     def volume_context(self):
+        # provide basic validation that the volume manager is supported on the
+        # given openstack release (nova-volume is only supported for E and F)
+        # it is up to release templates to set the correct volume driver.
+
+        os_rel = os_release('nova-common')
         vol_service = relation_get('volume_service')
         if not vol_service:
             return {}
-        vol_ctxt = {}
+        return vol_service
+
+        # ensure volume service is supported on specific openstack release.
         if vol_service == 'cinder':
-            vol_ctxt['volume_api_class'] = 'nova.volume.cinder.API'
+            if os_rel == 'essex':
+                e = ('Attempting to configure cinder volume manager on'
+                     'unsupported OpenStack release (essex)')
+                log(e, level=ERROR)
+                raise context.OSContextError(e)
+            return 'cinder'
         elif vol_service == 'nova-volume':
-            if os_release('nova-common') in ['essex', 'folsom']:
-                vol_ctxt['volume_api_class'] = 'nova.volume.api.API'
+            if os_release('nova-common') not in ['essex', 'folsom']:
+                e = ('Attempting to configure nova-volume manager on'
+                     'unsupported OpenStack release (%s).' % os_rel)
+                log(e, level=ERROR)
+                raise context.OSContextError(e)
+            return 'nova-volume'
         else:
-            log('Invalid volume service received via cloud-compute: %s' %
-                vol_service, level=ERROR)
-            raise
-        return vol_ctxt
+            e = ('Invalid volume service received via cloud-compute: %s' %
+                 vol_service)
+            log(e, level=ERROR)
+            raise context.OSContextError(e)
+
+    def network_manager_context(self):
+        ctxt = {}
+        if self.network_manager == 'flatdhcpmanager':
+            ctxt = self.flat_dhcp_context()
+        elif self.network_manager in ['neutron', 'quantum']:
+            ctxt = self.neutron_context()
+
+        _save_flag_file(path='/etc/nova/nm.conf', data=self.network_manager)
+
+        log('Generated config context for %s network manager.' %
+            self.network_manager)
+        return ctxt
 
     def __call__(self):
         rids = relation_ids('cloud-compute')
@@ -156,21 +229,14 @@ class CloudComputeContext(context.OSContextGenerator):
 
         ctxt = {}
 
-        net_manager = relation_get('network_manager')
+        net_manager = self.network_manager_context()
         if net_manager:
-            if net_manager.lower() == 'flatdhcpmanager':
-                ctxt.update({
-                    'network_manager_config': self.flat_dhcp_context()
-                })
-            elif net_manager.lower() == 'quantum':
-                ctxt.update({
-                    'network_manager_config': self.quantum_context()
-                })
-            _save_flag_file(path='/etc/nova/nm.conf', data=net_manager)
+            ctxt['network_manager'] = self.network_manager
+            ctxt['network_manager_config'] = net_manager
 
         vol_service = self.volume_context()
         if vol_service:
-            ctxt.update({'volume_service_config': vol_service})
+            ctxt['volume_service'] = vol_service
 
         return ctxt
 
@@ -203,27 +269,14 @@ class NeutronComputeContext(context.NeutronContext):
 
     @property
     def plugin(self):
+        return _neutron_plugin()
         from nova_compute_utils import neutron_plugin
         return neutron_plugin()
 
     @property
     def network_manager(self):
-        from nova_compute_utils import network_manager as manager
-        return manager()
+        return _network_manager()
 
     @property
     def neutron_security_groups(self):
-        groups = [relation_get('neutron_security_groups'),
-                  relation_get('quantum_security_groups')]
-        return ('yes' in groups or 'Yes' in groups)
-
-    def ovs_ctxt(self):
-        ctxt = super(NeutronComputeContext, self).ovs_ctxt()
-        if os_release('nova-common') == 'folsom':
-            n_driver = 'nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver'
-        else:
-            n_driver = 'nova.virt.libvirt.vif.LibvirtGenericVIFDriver'
-        ctxt.update({
-            'libvirt_vif_driver': n_driver,
-        })
-        return ctxt
+        return _neutron_security_groups()

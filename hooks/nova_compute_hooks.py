@@ -95,6 +95,11 @@ def amqp_changed():
 def db_joined():
     relation_set(database=config('database'), username=config('database-user'),
                  hostname=unit_get('private-address'))
+    if network_manager() in ['quantum', 'neutron']:
+        # XXX: Renaming relations from quantum_* to neutron_* here.
+        relation_set(neutron_database=config('neutron-database'),
+                     neutron_username=config('neutron-database-user'),
+                     neutron_hostname=unit_get('private-address'))
 
 
 @hooks.hook('shared-db-relation-changed')

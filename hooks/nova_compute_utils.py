@@ -213,9 +213,19 @@ def neutron_plugin():
 
 
 def network_manager():
+    '''
+    Obtain the network manager advertised by nova-c-c, renaming to Quantum
+    if required
+    '''
     manager = _network_config().get('network_manager')
     if manager:
         manager = manager.lower()
+        if manager not in ['quantum', 'neutron']:
+            return manager
+        if os_release('nova-common') in ['folsom', 'grizzly']:
+            return 'quantum'
+        else:
+            return 'neutron'
     return manager
 
 
@@ -303,6 +313,6 @@ def import_keystone_ca_cert():
     if not ca_cert:
         return
     log('Writing Keystone CA certificate to %s' % CA_CERT_PATH)
-    with open(CA_CERT_PATH) as out:
+    with open(CA_CERT_PATH, 'wb') as out:
         out.write(b64decode(ca_cert))
     check_call(['update-ca-certificates'])
