@@ -126,6 +126,7 @@ def resource_map():
             resource_map[conf] = {}
             resource_map[conf]['services'] = svcs
             resource_map[conf]['contexts'] = ctxts
+            resource_map[conf]['contexts'].append(NeutronComputeContext())
 
     if relation_ids('ceph'):
         resource_map.update(CEPH_RESOURCES)
