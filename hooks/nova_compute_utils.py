@@ -22,7 +22,6 @@ from nova_compute_context import (
     CloudComputeContext,
     NovaComputeLibvirtContext,
     NovaComputeCephContext,
-    OSConfigFlagContext,
     NeutronComputeContext,
 )
 
@@ -53,9 +52,9 @@ BASE_RESOURCE_MAP = {
         'contexts': [context.AMQPContext(),
                      context.SharedDBContext(),
                      context.ImageServiceContext(),
+                     context.OSConfigFlagContext(),
                      CloudComputeContext(),
                      NovaComputeCephContext(),
-                     OSConfigFlagContext(),
                      NeutronComputeContext()]
     },
 }
