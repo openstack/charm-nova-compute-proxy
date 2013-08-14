@@ -174,8 +174,8 @@ def determine_packages():
         packages.extend(VIRT_TYPES[virt_type])
     except KeyError:
         log('Unsupported virt-type configured: %s' % virt_type)
-
         raise
+
     return packages
 
 

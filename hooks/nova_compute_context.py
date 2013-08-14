@@ -186,20 +186,19 @@ class CloudComputeContext(context.OSContextGenerator):
         vol_service = relation_get('volume_service')
         if not vol_service:
             return {}
-        return vol_service
 
         # ensure volume service is supported on specific openstack release.
         if vol_service == 'cinder':
             if os_rel == 'essex':
-                e = ('Attempting to configure cinder volume manager on'
-                     'unsupported OpenStack release (essex)')
+                e = ('Attempting to configure cinder volume manager on '
+                     'an unsupported OpenStack release (essex)')
                 log(e, level=ERROR)
                 raise context.OSContextError(e)
             return 'cinder'
         elif vol_service == 'nova-volume':
             if os_release('nova-common') not in ['essex', 'folsom']:
-                e = ('Attempting to configure nova-volume manager on'
-                     'unsupported OpenStack release (%s).' % os_rel)
+                e = ('Attempting to configure nova-volume manager on '
+                     'an unsupported OpenStack release (%s).' % os_rel)
                 log(e, level=ERROR)
                 raise context.OSContextError(e)
             return 'nova-volume'

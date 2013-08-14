@@ -41,9 +41,9 @@ TO_PATCH = [
     'initialize_ssh_keys',
     'migration_enabled',
     'do_openstack_upgrade',
-    'quantum_attribute',
-    'quantum_enabled',
-    'quantum_plugin',
+    'network_manager',
+    'neutron_plugin_attribute',
+    'neutron_plugin',
     'public_ssh_key',
     'register_configs',
     # misc_utils
@@ -116,7 +116,8 @@ class NovaComputeRelationsTests(CharmTestCase):
         configs.complete_contexts = MagicMock()
         configs.complete_contexts.return_value = ['amqp']
         configs.write = MagicMock()
-        self.quantum_enabled.return_value = quantum
+        if quantum:
+            self.network_manager.return_value = 'quantum'
         hooks.amqp_changed()
 
     @patch.object(hooks, 'CONFIGS')
@@ -152,7 +153,8 @@ class NovaComputeRelationsTests(CharmTestCase):
         configs.complete_contexts = MagicMock()
         configs.complete_contexts.return_value = ['shared-db']
         configs.write = MagicMock()
-        self.quantum_enabled.return_value = quantum
+        if quantum:
+            self.network_manager.return_value = 'quantum'
         hooks.db_changed()
 
     @patch.object(hooks, 'CONFIGS')
@@ -163,7 +165,7 @@ class NovaComputeRelationsTests(CharmTestCase):
 
     @patch.object(hooks, 'CONFIGS')
     def test_db_changed_with_data_and_quantum(self, configs):
-        self.quantum_attribute.return_value = '/etc/quantum/plugin.conf'
+        self.neutron_plugin_attribute.return_value = '/etc/quantum/plugin.conf'
         self._shared_db_test(configs, quantum=True)
         ex = [call('/etc/nova/nova.conf'), call('/etc/quantum/plugin.conf')]
         self.assertEquals(ex, configs.write.call_args_list)

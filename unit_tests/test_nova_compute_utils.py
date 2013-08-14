@@ -7,11 +7,17 @@ import hooks.nova_compute_utils as utils
 
 TO_PATCH = [
     'config',
-    'get_os_codename_package',
+    'os_release',
     'log',
+    'neutron_plugin_attribute',
     'related_units',
     'relation_ids',
     'relation_get',
+]
+
+OVS_PKGS = [
+    'quantum-plugin-openvswitch-agent',
+    'openvswitch-datapath-dkms',
 ]
 
 
@@ -22,7 +28,7 @@ class NovaComputeUtilsTests(CharmTestCase):
 
     @patch.object(utils, 'network_manager')
     def test_determine_packages_nova_network(self, net_man):
-        net_man.return_value = 'FlatDHCPManager'
+        net_man.return_value = 'flatdhcpmanager'
         self.relation_ids.return_value = []
         result = utils.determine_packages()
         ex = utils.BASE_PACKAGES + [
@@ -32,33 +38,27 @@ class NovaComputeUtilsTests(CharmTestCase):
         ]
         self.assertEquals(ex, result)
 
-    @patch.object(utils, 'quantum_plugin')
+    @patch.object(utils, 'neutron_plugin')
     @patch.object(utils, 'network_manager')
-    def test_determine_packages_quantum(self, net_man, q_plugin):
-        net_man.return_value = 'Quantum'
-        q_plugin.return_value = 'ovs'
+    def test_determine_packages_quantum(self, net_man, n_plugin):
+        self.neutron_plugin_attribute.return_value = OVS_PKGS
+        net_man.return_value = 'quantum'
+        n_plugin.return_value = 'ovs'
         self.relation_ids.return_value = []
         result = utils.determine_packages()
-        ex = utils.BASE_PACKAGES + [
-            'quantum-plugin-openvswitch-agent',
-            'openvswitch-datapath-dkms',
-            'nova-compute-kvm'
-        ]
+        ex = utils.BASE_PACKAGES + OVS_PKGS + ['nova-compute-kvm']
         self.assertEquals(ex, result)
 
-    @patch.object(utils, 'quantum_plugin')
+    @patch.object(utils, 'neutron_plugin')
     @patch.object(utils, 'network_manager')
-    def test_determine_packages_quantum_ceph(self, net_man, q_plugin):
-        net_man.return_value = 'Quantum'
-        q_plugin.return_value = 'ovs'
+    def test_determine_packages_quantum_ceph(self, net_man, n_plugin):
+        self.neutron_plugin_attribute.return_value = OVS_PKGS
+        net_man.return_value = 'quantum'
+        n_plugin.return_value = 'ovs'
         self.relation_ids.return_value = ['ceph:0']
         result = utils.determine_packages()
-        ex = utils.BASE_PACKAGES + [
-            'quantum-plugin-openvswitch-agent',
-            'openvswitch-datapath-dkms',
-            'ceph-common',
-            'nova-compute-kvm'
-        ]
+        ex = (utils.BASE_PACKAGES + OVS_PKGS +
+              ['ceph-common', 'nova-compute-kvm'])
         self.assertEquals(ex, result)
 
     @patch.object(utils, 'network_manager')
@@ -112,7 +112,7 @@ class NovaComputeUtilsTests(CharmTestCase):
         }
         self.assertEquals(ex, result)
 
-    @patch.object(utils, 'quantum_plugin')
+    @patch.object(utils, 'neutron_plugin')
     @patch.object(utils, 'network_manager')
     def test_resource_map_quantum_ovs(self, net_man, _plugin):
         self.skipTest('skipped until contexts are properly mocked.')
@@ -208,7 +208,7 @@ class NovaComputeUtilsTests(CharmTestCase):
         self.relation_get.return_value = 'Zm9vX2NlcnQK'
         with patch_open() as (_open, _file):
             utils.import_keystone_ca_cert()
-            _open.assert_called_with(utils.CA_CERT_PATH)
+            _open.assert_called_with(utils.CA_CERT_PATH, 'wb')
             _file.write.assert_called_with('foo_cert\n')
         check_call.assert_called_with(['update-ca-certificates'])
 
@@ -217,7 +217,7 @@ class NovaComputeUtilsTests(CharmTestCase):
     @patch.object(utils, 'resource_map')
     def test_register_configs(self, resource_map, quantum, renderer):
         quantum.return_value = False
-        self.get_os_codename_package.return_value = 'havana'
+        self.os_release.return_value = 'havana'
         fake_renderer = MagicMock()
         fake_renderer.register = MagicMock()
         renderer.return_value = fake_renderer
