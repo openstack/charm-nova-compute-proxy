@@ -265,7 +265,7 @@ class NeutronComputeContext(context.NeutronContext):
         if not service_running('openvswitch-switch'):
             service_start('openvswitch-switch')
 
-        ovs_output = check_output['ovs-vsctl', 'show']
+        ovs_output = check_output(['ovs-vsctl', 'show'])
         for ln in ovs_output.split('\n'):
             if OVS_BRIDGE in ln.strip():
                 log('Found OVS bridge: %s.' % OVS_BRIDGE)
