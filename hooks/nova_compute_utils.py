@@ -72,14 +72,14 @@ CEPH_RESOURCES = {
 
 QUANTUM_RESOURCES = {
     '/etc/quantum/quantum.conf': {
-        'services': ['quantum-server'],
+        'services': [],
         'contexts': [context.AMQPContext()],
     }
 }
 
 NEUTRON_RESOURCES = {
     '/etc/neutron/neutron.conf': {
-        'services': ['neutron-server'],
+        'services': [],
         'contexts': [context.AMQPContext()],
     }
 }

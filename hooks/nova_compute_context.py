@@ -1,6 +1,9 @@
+from subprocess import check_call, check_output
+
 from charmhelpers.contrib.openstack import context
 
-from charmhelpers.core.host import apt_install, filter_installed_packages
+from charmhelpers.core.host import (
+    apt_install, filter_installed_packages, service_running, service_start)
 
 from charmhelpers.core.hookenv import (
     config,
@@ -9,7 +12,6 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     service_name,
     ERROR,
-    WARNING,
 )
 
 from charmhelpers.contrib.openstack.utils import os_release
@@ -18,6 +20,8 @@ from charmhelpers.contrib.openstack.utils import os_release
 # This is just a label and it must be consistent across
 # nova-compute nodes to support live migration.
 CEPH_SECRET_UUID = '514c9fca-8cbe-11e2-9c52-3bc8c7819472'
+
+OVS_BRIDGE = 'br-int'
 
 
 def _save_flag_file(path, data):
@@ -240,7 +244,6 @@ class CloudComputeContext(context.OSContextGenerator):
         return ctxt
 
 
-
 class NeutronComputeContext(context.NeutronContext):
     interfaces = []
 
@@ -257,3 +260,26 @@ class NeutronComputeContext(context.NeutronContext):
     @property
     def neutron_security_groups(self):
         return _neutron_security_groups()
+
+    def _ensure_bridge(self):
+        if not service_running('openvswitch-switch'):
+            service_start('openvswitch-switch')
+
+        ovs_output = check_output['ovs-vsctl', 'show']
+        for ln in ovs_output.split('\n'):
+            if OVS_BRIDGE in ln.strip():
+                log('Found OVS bridge: %s.' % OVS_BRIDGE)
+                return
+        log('Creating new OVS bridge: %s.' % OVS_BRIDGE)
+        check_call(['ovs-vsctl', 'add-br', OVS_BRIDGE])
+
+    def ovs_ctxt(self):
+        # In addition to generating config context, ensure the OVS service
+        # is running and the OVS bridge exists.
+        ovs_ctxt = super(NeutronComputeContext, self).ovs_ctxt()
+        if not ovs_ctxt:
+            return {}
+
+        self._ensure_bridge()
+
+        return ovs_ctxt
