@@ -219,7 +219,10 @@ class OSConfigRenderer(object):
         if config_file not in self.templates:
             log('Config not registered: %s' % config_file, level=ERROR)
             raise OSConfigException
+
         ctxt = self.templates[config_file].context()
+        if not ctxt:
+            return
 
         _tmpl = os.path.basename(config_file)
         try:
@@ -247,8 +250,13 @@ class OSConfigRenderer(object):
         if config_file not in self.templates:
             log('Config not registered: %s' % config_file, level=ERROR)
             raise OSConfigException
+
+        cfg_out = self.render(config_file)
+        if not cfg_out:
+            return
+
         with open(config_file, 'wb') as out:
-            out.write(self.render(config_file))
+            out.write(cfg_out)
         log('Wrote template %s.' % config_file, level=INFO)
 
     def write_all(self):
