@@ -136,8 +136,27 @@ class NovaComputeRelationsTests(CharmTestCase):
     def test_db_joined(self):
         self.unit_get.return_value = 'nova.foohost.com'
         hooks.db_joined()
-        self.relation_set.assert_called_with(database='nova', username='nova',
-                                             hostname='nova.foohost.com')
+        self.relation_set.assert_called_with(relation_id=None,
+                                             nova_database='nova',
+                                             nova_username='nova',
+                                             nova_hostname='nova.foohost.com')
+        self.unit_get.assert_called_with('private-address')
+
+    def test_db_joined_quantum(self):
+        self.unit_get.return_value = 'nova.foohost.com'
+        self.network_manager.return_value = 'quantum'
+        hooks.db_joined(rid='shared-db:0')
+        calls = [call(nova_database='nova',
+                      nova_username='nova',
+                      nova_hostname='nova.foohost.com',
+                      relation_id='shared-db:0'),
+                 call(neutron_database='neutron',
+                      neutron_username='neutron',
+                      neutron_hostname='nova.foohost.com',
+                      relation_id='shared-db:0'),
+]
+        [self.assertIn(c, self.relation_set.call_args_list)
+         for c in calls]
         self.unit_get.assert_called_with('private-address')
 
     @patch.object(hooks, 'CONFIGS')

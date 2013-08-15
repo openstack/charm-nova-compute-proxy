@@ -92,12 +92,15 @@ def amqp_changed():
 
 
 @hooks.hook('shared-db-relation-joined')
-def db_joined():
-    relation_set(database=config('database'), username=config('database-user'),
-                 hostname=unit_get('private-address'))
+def db_joined(rid=None):
+    relation_set(relation_id=rid,
+                 nova_database=config('database'),
+                 nova_username=config('database-user'),
+                 nova_hostname=unit_get('private-address'))
     if network_manager() in ['quantum', 'neutron']:
         # XXX: Renaming relations from quantum_* to neutron_* here.
-        relation_set(neutron_database=config('neutron-database'),
+        relation_set(relation_id=rid,
+                     neutron_database=config('neutron-database'),
                      neutron_username=config('neutron-database-user'),
                      neutron_hostname=unit_get('private-address'))
 
@@ -145,6 +148,10 @@ def compute_changed():
     CONFIGS.write_all()
     import_authorized_keys()
     import_keystone_ca_cert()
+    if network_manager() in ['quantum', 'neutron']:
+        # in case we already have a database relation, need to request
+        # access to the additional neutron database.
+        [db_joined(rid) for rid in relation_ids('shared-db')]
 
 
 @hooks.hook('ceph-relation-joined')

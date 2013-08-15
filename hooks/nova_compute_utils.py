@@ -50,7 +50,7 @@ BASE_RESOURCE_MAP = {
     '/etc/nova/nova.conf': {
         'services': ['nova-compute'],
         'contexts': [context.AMQPContext(),
-                     context.SharedDBContext(),
+                     context.SharedDBContext(relation_prefix='nova'),
                      context.ImageServiceContext(),
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),
