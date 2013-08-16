@@ -1,3 +1,5 @@
+import socket
+
 from subprocess import check_call, check_output
 
 from charmhelpers.contrib.openstack import context
@@ -11,6 +13,7 @@ from charmhelpers.core.hookenv import (
     relation_get,
     relation_ids,
     service_name,
+    unit_get,
     ERROR,
 )
 
@@ -244,6 +247,28 @@ class CloudComputeContext(context.OSContextGenerator):
         return ctxt
 
 
+def get_host_ip():
+    # we used to have a charm-helper to do this, but its disappeared?
+    # taken from quantum-gateway
+
+    try:
+        import dns.resolver
+    except ImportError:
+        apt_install('python-dnspython')
+        import dns.resolver
+
+    hostname = unit_get('private-address')
+    try:
+        # Test to see if already an IPv4 address
+        socket.inet_aton(hostname)
+        return hostname
+    except socket.error:
+        answers = dns.resolver.query(hostname, 'A')
+        if answers:
+            return answers[0].address
+    return None
+
+
 class NeutronComputeContext(context.NeutronContext):
     interfaces = []
 
@@ -275,11 +300,13 @@ class NeutronComputeContext(context.NeutronContext):
 
     def ovs_ctxt(self):
         # In addition to generating config context, ensure the OVS service
-        # is running and the OVS bridge exists.
+        # is running and the OVS bridge exists. Also need to ensure
+        # local_ip points to actual IP, not hostname.
         ovs_ctxt = super(NeutronComputeContext, self).ovs_ctxt()
         if not ovs_ctxt:
             return {}
 
         self._ensure_bridge()
 
+        ovs_ctxt['local_ip'] = get_host_ip()
         return ovs_ctxt
