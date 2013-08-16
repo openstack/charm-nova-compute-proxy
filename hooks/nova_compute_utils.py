@@ -54,8 +54,7 @@ BASE_RESOURCE_MAP = {
                      context.ImageServiceContext(),
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),
-                     NovaComputeCephContext(),
-                     NeutronComputeContext()]
+                     NovaComputeCephContext()],
     },
 }
 
@@ -104,17 +103,24 @@ def resource_map():
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     net_manager = network_manager()
 
+    # Network manager gets set late by the cloud-compute interface.
+    # FlatDHCPManager only requires some extra packages.
     if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
             config('multi-host').lower() == 'yes'):
         resource_map['/etc/nova/nova.conf']['services'].extend(
             ['nova-api', 'nova-network']
         )
 
+    # Neutron/quantum requires additional contexts, as well as new resources
+    # depending on the plugin used.
     if net_manager in ['neutron', 'quantum']:
         if net_manager == 'quantum':
             resource_map.update(QUANTUM_RESOURCES)
         if net_manager == 'neutron':
             resource_map.update(NEUTRON_RESOURCES)
+
+        resource_map['/etc/nova/nova.conf']['contexts'].append(
+            NeutronComputeContext())
 
         plugin = neutron_plugin()
         if plugin:
