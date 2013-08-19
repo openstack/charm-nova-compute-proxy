@@ -5,6 +5,8 @@ from base64 import b64decode
 from copy import deepcopy
 from subprocess import check_call, check_output
 
+from charmhelpers.core.host import apt_update, apt_install
+
 from charmhelpers.core.hookenv import (
     config,
     log,
@@ -14,9 +16,13 @@ from charmhelpers.core.hookenv import (
 )
 
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
-
-from charmhelpers.contrib.openstack.utils import os_release
 from charmhelpers.contrib.openstack import templating, context
+
+from charmhelpers.contrib.openstack.utils import (
+    configure_installation_source,
+    get_os_codename_install_source,
+    os_release
+)
 
 from nova_compute_context import (
     CloudComputeContext,
@@ -307,7 +313,24 @@ def configure_live_migration(configs=None):
         initialize_ssh_keys()
 
 
-def do_openstack_upgrade():
+def do_openstack_upgrade(configs):
+    new_src = config('openstack-origin')
+    new_os_rel = get_os_codename_install_source(new_src)
+    log('Performing OpenStack upgrade to %s.' % (new_os_rel))
+
+    configure_installation_source(new_src)
+    apt_update()
+
+    dpkg_opts = [
+        '--option', 'Dpkg::Options::=--force-confnew',
+        '--option', 'Dpkg::Options::=--force-confdef',
+    ]
+
+    apt_install(packages=determine_packages(), options=dpkg_opts, fatal=True)
+
+    # set CONFIGS to load templates from new release and regenerate config
+    configs.set_release(openstack_release=new_os_rel)
+    configs.write_all()
     pass
 
 
