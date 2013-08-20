@@ -177,6 +177,16 @@ def ceph_changed():
     CONFIGS.write('/etc/nova/nova.conf')
 
 
+@hooks.hook('amqp-relation-broken',
+            'ceph-relation-broken',
+            'cloud-compute-relation-broken',
+            'image-service-relation-broken',
+            'shared-db-relation-broken')
+@restart_on_change(restart_map())
+def relation_broken():
+    CONFIGS.write_all()
+
+
 def main():
     try:
         hooks.execute(sys.argv)
