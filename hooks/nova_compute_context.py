@@ -87,7 +87,7 @@ class NovaComputeLibvirtContext(context.OSContextGenerator):
             # /etc/default/libvirt-bin
             'libvirtd_opts': '-d',
             # /etc/libvirt/libvirtd.conf (
-            'listen_tls': 1,
+            'listen_tls': 0,
         }
 
         # enable tcp listening if configured for live migration.
