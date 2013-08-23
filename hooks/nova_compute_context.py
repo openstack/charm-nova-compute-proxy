@@ -51,7 +51,7 @@ def _neutron_security_groups():
         instructed us to use neutron security groups.
         '''
         for rid in relation_ids('cloud-compute'):
-            for unit in related_units('cloud-compute'):
+            for unit in related_units(unit):
                 groups = [
                     relation_get('neutron_security_groups',
                                  rid=rid, unit=unit),
