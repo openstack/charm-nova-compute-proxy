@@ -12,6 +12,7 @@ from charmhelpers.core.hookenv import (
     log,
     relation_get,
     relation_ids,
+    related_units,
     service_name,
     unit_get,
     ERROR,
@@ -45,9 +46,21 @@ def _network_manager():
 
 
 def _neutron_security_groups():
-        groups = [relation_get('neutron_security_groups'),
-                  relation_get('quantum_security_groups')]
-        return ('yes' in groups or 'Yes' in groups)
+        '''
+        Inspects current cloud-compute relation and determine if nova-c-c has
+        instructed us to use neutron security groups.
+        '''
+        for rid in relation_ids('cloud-compute'):
+            for unit in related_units('cloud-compute'):
+                groups = [
+                    relation_get('neutron_security_groups',
+                                 rid=rid, unit=unit),
+                    relation_get('quantum_security_groups',
+                                 rid=rid, unit=unit)
+                ]
+                if ('yes' in groups or 'Yes' in groups):
+                    return True
+        return False
 
 
 def _neutron_plugin():
@@ -55,8 +68,10 @@ def _neutron_plugin():
         return neutron_plugin()
 
 
-def _neutron_url():
-        return relation_get('neutron_url') or relation_get('quantum_url')
+def _neutron_url(rid, unit):
+        # supports legacy relation settings.
+        return (relation_get('neutron_url', rid=rid, unit=unit) or
+                relation_get('quantum_url', rid=rid, unit=unit))
 
 
 class NovaComputeLibvirtContext(context.OSContextGenerator):
@@ -131,10 +146,19 @@ class CloudComputeContext(context.OSContextGenerator):
 
     @property
     def volume_service(self):
-        return relation_get('volume_service')
+        volume_service = None
+        for rid in relation_ids('cloud-compute'):
+            for unit in related_units(rid):
+                volume_service = relation_get('volume_service',
+                                              rid=rid, unit=unit)
+        return volume_service
 
     def flat_dhcp_context(self):
-        ec2_host = relation_get('ec2_host')
+        ec2_host = None
+        for rid in relation_ids('cloud-compute'):
+            for unit in related_units(rid):
+                ec2_host = relation_get('ec2_host', rid=rid, unit=unit)
+
         if not ec2_host:
             return {}
 
@@ -150,23 +174,41 @@ class CloudComputeContext(context.OSContextGenerator):
         # generate config context for neutron or quantum. these get converted
         # directly into flags in nova.conf
         # NOTE: Its up to release templates to set correct driver
+
         def _legacy_quantum(ctxt):
+            # rename neutron flags to support legacy quantum.
             renamed = {}
             for k, v in ctxt.iteritems():
                 k = k.replace('neutron', 'quantum')
                 renamed[k] = v
             return renamed
 
-        neutron_ctxt = {
-            'neutron_auth_strategy': 'keystone',
-            'keystone_host': relation_get('auth_host'),
-            'auth_port': relation_get('auth_port'),
-            'neutron_admin_tenant_name': relation_get('service_tenant_name'),
-            'neutron_admin_username': relation_get('service_username'),
-            'neutron_admin_password': relation_get('service_password'),
-            'neutron_plugin': _neutron_plugin(),
-            'neutron_url': _neutron_url(),
-        }
+        neutron_ctxt = {'neutron_url': None}
+        for rid in relation_ids('cloud-compute'):
+            for unit in related_units(rid):
+                rel = {'rid': rid, 'unit': unit}
+
+                url = _neutron_url(**rel)
+                if not url:
+                    # only bother with units that have a neutron url set.
+                    continue
+
+                neutron_ctxt = {
+                    'neutron_auth_strategy': 'keystone',
+                    'keystone_host': relation_get(
+                        'auth_host', **rel),
+                    'auth_port': relation_get(
+                        'auth_port', **rel),
+                    'neutron_admin_tenant_name': relation_get(
+                        'service_tenant_name', **rel),
+                    'neutron_admin_username': relation_get(
+                        'service_username', **rel),
+                    'neutron_admin_password': relation_get(
+                        'service_password', **rel),
+                    'neutron_plugin': _neutron_plugin(),
+                    'neutron_url': url,
+                }
+
         missing = [k for k, v in neutron_ctxt.iteritems() if v in ['', None]]
         if missing:
             log('Missing required relation settings for Quantum: ' +
@@ -189,20 +231,20 @@ class CloudComputeContext(context.OSContextGenerator):
         # given openstack release (nova-volume is only supported for E and F)
         # it is up to release templates to set the correct volume driver.
 
-        os_rel = os_release('nova-common')
-        vol_service = relation_get('volume_service')
-        if not vol_service:
+        if not self.volume_service:
             return {}
 
+        os_rel = os_release('nova-common')
+
         # ensure volume service is supported on specific openstack release.
-        if vol_service == 'cinder':
+        if self.volume_service == 'cinder':
             if os_rel == 'essex':
                 e = ('Attempting to configure cinder volume manager on '
                      'an unsupported OpenStack release (essex)')
                 log(e, level=ERROR)
                 raise context.OSContextError(e)
             return 'cinder'
-        elif vol_service == 'nova-volume':
+        elif self.volume_service == 'nova-volume':
             if os_release('nova-common') not in ['essex', 'folsom']:
                 e = ('Attempting to configure nova-volume manager on '
                      'an unsupported OpenStack release (%s).' % os_rel)
@@ -211,7 +253,7 @@ class CloudComputeContext(context.OSContextGenerator):
             return 'nova-volume'
         else:
             e = ('Invalid volume service received via cloud-compute: %s' %
-                 vol_service)
+                 self.volume_service)
             log(e, level=ERROR)
             raise context.OSContextError(e)
 
@@ -300,6 +342,7 @@ class NeutronComputeContext(context.NeutronContext):
         # In addition to generating config context, ensure the OVS service
         # is running and the OVS bridge exists. Also need to ensure
         # local_ip points to actual IP, not hostname.
+        from pprint import pprint;         import ipdb; ipdb.set_trace() ############################## Breakpoint ##############################
         ovs_ctxt = super(NeutronComputeContext, self).ovs_ctxt()
         if not ovs_ctxt:
             return {}

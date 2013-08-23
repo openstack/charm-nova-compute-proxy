@@ -1,5 +1,4 @@
-from mock import MagicMock, patch
-from copy import deepcopy
+from mock import  patch
 from unit_tests.test_utils import CharmTestCase
 
 from charmhelpers.contrib.openstack.context import OSContextError
@@ -11,6 +10,7 @@ TO_PATCH = [
     'filter_installed_packages',
     'relation_ids',
     'relation_get',
+    'related_units',
     'config',
     'log',
     'os_release',
@@ -70,8 +70,8 @@ class NovaComputeContextTests(CharmTestCase):
     def test_cloud_compute_volume_context_cinder(self, netman):
         netman.return_value = None
         self.relation_ids.return_value = 'cloud-compute:0'
+        self.related_units.return_value = 'nova-cloud-controller/0'
         cloud_compute = context.CloudComputeContext()
-
         self.test_relation.set({'volume_service': 'cinder'})
         self.assertEquals({'volume_service': 'cinder'}, cloud_compute())
 
@@ -79,6 +79,7 @@ class NovaComputeContextTests(CharmTestCase):
     def test_cloud_compute_volume_context_nova_vol(self, netman):
         netman.return_value = None
         self.relation_ids.return_value = 'cloud-compute:0'
+        self.related_units.return_value = 'nova-cloud-controller/0'
         cloud_compute = context.CloudComputeContext()
         self.os_release.return_value = 'essex'
         self.test_relation.set({'volume_service': 'nova-volume'})
@@ -99,6 +100,7 @@ class NovaComputeContextTests(CharmTestCase):
     def test_cloud_compute_flatdhcp_context(self, netman):
         netman.return_value = 'flatdhcpmanager'
         self.relation_ids.return_value = 'cloud-compute:0'
+        self.related_units.return_value = 'nova-cloud-controller/0'
         self.test_relation.set({
             'network_manager': 'FlatDHCPManager',
             'ec2_host': 'novaapihost'})
@@ -116,6 +118,8 @@ class NovaComputeContextTests(CharmTestCase):
     @patch.object(context, '_neutron_url')
     @patch.object(context, '_network_manager')
     def test_cloud_compute_quantum_context(self, netman, url, plugin):
+        self.relation_ids.return_value = 'cloud-compute:0'
+        self.related_units.return_value = 'nova-cloud-controller/0'
         netman.return_value = 'quantum'
         plugin.return_value = 'ovs'
         url.return_value = 'http://nova-c-c:9696'
@@ -140,33 +144,13 @@ class NovaComputeContextTests(CharmTestCase):
         self._save_flag_file.assert_called_with(
             path='/etc/nova/nm.conf', data='quantum')
 
-#    def test_quantum_plugin_context_no_setting(self):
-#        qplugin = context.QuantumPluginContext()
-#        self.assertEquals({}, qplugin())
-#
-#    def _test_qplugin_context(self, os_release):
-#        self.get_os_codename_package.return_value = os_release
-#        self.test_relation.set(
-#            {'quantum_plugin': 'ovs', 'quantum_security_groups': 'yes'})
-#        qplugin = context.QuantumPluginContext()
-#        qplugin._ensure_packages = MagicMock()
-#        return qplugin()
-#
-#    def test_quantum_plugin_context_ovs_folsom(self):
-#        ex_ctxt = deepcopy(BASE_QUANTUM_OVS_PLUGIN_CONTEXT)
-#        ex_ctxt['libvirt_vif_driver'] = ('nova.virt.libvirt.vif.'
-#                                         'LibvirtHybridOVSBridgeDriver')
-#        self.assertEquals(ex_ctxt, self._test_qplugin_context('folsom'))
-#        self._save_flag_file.assert_called_with(
-#            path='/etc/nova/quantum_plugin.conf', data='ovs')
-#
-#    def test_quantum_plugin_context_ovs_grizzly_and_beyond(self):
-#        ex_ctxt = deepcopy(BASE_QUANTUM_OVS_PLUGIN_CONTEXT)
-#        ex_ctxt['libvirt_vif_driver'] = ('nova.virt.libvirt.vif.'
-#                                         'LibvirtGenericVIFDriver')
-#        self.assertEquals(ex_ctxt, self._test_qplugin_context('grizzly'))
-#        self._save_flag_file.assert_called_with(
-#            path='/etc/nova/quantum_plugin.conf', data='ovs')
+    @patch.object(context.NeutronComputeContext, 'network_manager')
+    @patch.object(context.NeutronComputeContext, 'plugin')
+    def test_quantum_plugin_context_no_setting(self, plugin, nm):
+        plugin.return_value = None
+        qplugin = context.NeutronComputeContext()
+        with patch.object(qplugin, '_ensure_packages'):
+            self.assertEquals({}, qplugin())
 
     def test_libvirt_bin_context_no_migration(self):
         self.test_config.set('enable-live-migration', False)
@@ -178,27 +162,3 @@ class NovaComputeContextTests(CharmTestCase):
         libvirt = context.NovaComputeLibvirtContext()
         self.assertEquals(
             {'libvirtd_opts': '-d -l', 'listen_tls': 1}, libvirt())
-
-#    def test_config_flag_context_none_set_in_config(self):
-#        flags = context.OSConfigFlagContext()
-#        self.assertEquals({}, flags())
-#
-#    def test_conflig_flag_context(self):
-#        self.test_config.set('config-flags', 'one=two,three=four,five=six')
-#        flags = context.OSConfigFlagContext()
-#        ex = {
-#            'user_config_flags': {
-#                'one': 'two', 'three': 'four', 'five': 'six'
-#            }
-#        }
-#        self.assertEquals(ex, flags())
-#
-#    def test_conflig_flag_context_filters_bad_input(self):
-#        self.test_config.set('config-flags', 'one=two,threefour,five=six')
-#        flags = context.OSConfigFlagContext()
-#        ex = {
-#            'user_config_flags': {
-#                'one': 'two', 'five': 'six'
-#            }
-#        }
-#        self.assertEquals(ex, flags())
