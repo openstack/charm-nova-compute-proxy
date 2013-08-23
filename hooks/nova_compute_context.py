@@ -342,7 +342,6 @@ class NeutronComputeContext(context.NeutronContext):
         # In addition to generating config context, ensure the OVS service
         # is running and the OVS bridge exists. Also need to ensure
         # local_ip points to actual IP, not hostname.
-        from pprint import pprint;         import ipdb; ipdb.set_trace() ############################## Breakpoint ##############################
         ovs_ctxt = super(NeutronComputeContext, self).ovs_ctxt()
         if not ovs_ctxt:
             return {}
