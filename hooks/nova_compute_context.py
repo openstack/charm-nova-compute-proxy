@@ -275,8 +275,6 @@ class NeutronComputeContext(context.NeutronContext):
     @property
     def plugin(self):
         return _neutron_plugin()
-        from nova_compute_utils import neutron_plugin
-        return neutron_plugin()
 
     @property
     def network_manager(self):
