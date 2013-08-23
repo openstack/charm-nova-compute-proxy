@@ -179,7 +179,6 @@ def ceph_changed():
 
 @hooks.hook('amqp-relation-broken',
             'ceph-relation-broken',
-            'cloud-compute-relation-broken',
             'image-service-relation-broken',
             'shared-db-relation-broken')
 @restart_on_change(restart_map())
