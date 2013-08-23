@@ -153,8 +153,7 @@ class NovaComputeRelationsTests(CharmTestCase):
                  call(neutron_database='neutron',
                       neutron_username='neutron',
                       neutron_hostname='nova.foohost.com',
-                      relation_id='shared-db:0'),
-]
+                      relation_id='shared-db:0')]
         [self.assertIn(c, self.relation_set.call_args_list)
          for c in calls]
         self.unit_get.assert_called_with('private-address')
@@ -237,12 +236,8 @@ class NovaComputeRelationsTests(CharmTestCase):
         for func in expected_funcs:
             self.assertTrue(func.called)
 
-    @patch('os.mkdir')
-    @patch('os.path.isdir')
-    def test_ceph_joined(self, isdir, mkdir):
-        isdir.return_value = False
+    def test_ceph_joined(self):
         hooks.ceph_joined()
-        mkdir.assert_called_with('/etc/ceph')
         self.apt_install.assert_called_with(['ceph-common'], fatal=True)
 
     @patch.object(hooks, 'CONFIGS')

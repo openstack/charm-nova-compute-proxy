@@ -157,8 +157,6 @@ def compute_changed():
 @hooks.hook('ceph-relation-joined')
 @restart_on_change(restart_map())
 def ceph_joined():
-    if not os.path.isdir('/etc/ceph'):
-        os.mkdir('/etc/ceph')
     apt_install(filter_installed_packages(['ceph-common']), fatal=True)
 
 
