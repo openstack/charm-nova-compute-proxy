@@ -121,9 +121,10 @@ def resource_map():
     # depending on the plugin used.
     if net_manager in ['neutron', 'quantum']:
         if net_manager == 'quantum':
-            resource_map.update(QUANTUM_RESOURCES)
+            nm_rsc = QUANTUM_RESOURCES
         if net_manager == 'neutron':
-            resource_map.update(NEUTRON_RESOURCES)
+            nm_rsc = NEUTRON_RESOURCES
+        resource_map.update(nm_rsc)
 
         resource_map['/etc/nova/nova.conf']['contexts'].append(
             NeutronComputeContext())
@@ -138,6 +139,9 @@ def resource_map():
             resource_map[conf]['services'] = svcs
             resource_map[conf]['contexts'] = ctxts
             resource_map[conf]['contexts'].append(NeutronComputeContext())
+
+            # associate the plugin agent with main network manager config(s)
+            [resource_map[nmc]['services'].extend(svcs) for nmc in nm_rsc]
 
     if relation_ids('ceph'):
         resource_map.update(CEPH_RESOURCES)
