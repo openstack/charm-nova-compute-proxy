@@ -1,4 +1,4 @@
-from mock import  patch
+from mock import patch
 from unit_tests.test_utils import CharmTestCase
 
 from charmhelpers.contrib.openstack.context import OSContextError
