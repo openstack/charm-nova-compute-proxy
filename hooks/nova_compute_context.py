@@ -1,3 +1,4 @@
+import os
 import socket
 
 from subprocess import check_call, check_output
@@ -109,6 +110,8 @@ class NovaComputeVirtContext(context.OSContextGenerator):
 
 class NovaComputeCephContext(context.CephContext):
     def libvirt_ceph(self, key):
+        if not os.path.isfile('/etc/ceph/secret.xml'):
+            return
         # create secret for libvirt usage.
         cmd = ['virsh', 'secret-define', '--file', '/etc/ceph/secret.xml']
         check_call(cmd)
@@ -132,7 +135,7 @@ class NovaComputeCephContext(context.CephContext):
         # Ensure required hypervisor-specific config.
         # Current supported libvirt flavors.  Extend?
         if config('virt-type') in ['kvm', 'qemu', 'lxc']:
-            self.libvit_ceph(ctxt['key'])
+            self.libvirt_ceph(ctxt['key'])
 
         return ctxt
 
