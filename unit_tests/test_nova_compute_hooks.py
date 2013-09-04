@@ -20,6 +20,7 @@ TO_PATCH = [
     'Hooks',
     'config',
     'log',
+    'relation_get',
     'relation_ids',
     'relation_set',
     'service_name',
@@ -34,6 +35,7 @@ TO_PATCH = [
     'openstack_upgrade_available',
     # nova_compute_utils
     #'PACKAGES',
+    'create_libvirt_secret',
     'restart_map',
     'determine_packages',
     'import_authorized_keys',

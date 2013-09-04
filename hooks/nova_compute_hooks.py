@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import os
 import sys
 
 from charmhelpers.core.hookenv import (
@@ -8,6 +7,7 @@ from charmhelpers.core.hookenv import (
     config,
     log,
     relation_ids,
+    relation_get,
     relation_set,
     service_name,
     unit_get,
@@ -29,6 +29,7 @@ from charmhelpers.contrib.openstack.utils import (
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 
 from nova_compute_utils import (
+    create_libvirt_secret,
     determine_packages,
     import_authorized_keys,
     import_keystone_ca_cert,
@@ -41,6 +42,8 @@ from nova_compute_utils import (
     restart_map,
     register_configs,
 )
+
+from nova_compute_context import CEPH_SECRET_UUID
 
 from misc_utils import (
     ensure_ceph_keyring,
@@ -173,6 +176,13 @@ def ceph_changed():
     CONFIGS.write('/etc/ceph/ceph.conf')
     CONFIGS.write('/etc/ceph/secret.xml')
     CONFIGS.write('/etc/nova/nova.conf')
+
+    # With some refactoring, this can move into NovaComputeCephContext
+    # and allow easily extended to support other compute flavors.
+    if config('virt-type') in ['kvm', 'qemu', 'lxc']:
+        create_libvirt_secret(secret_file='/etc/ceph/secret.xml',
+                              secret_uuid=CEPH_SECRET_UUID,
+                              key=relation_get('key'))
 
 
 @hooks.hook('amqp-relation-broken',
