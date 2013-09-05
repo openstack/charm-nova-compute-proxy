@@ -1,4 +1,3 @@
-import socket
 
 from subprocess import check_call, check_output
 
@@ -18,7 +17,7 @@ from charmhelpers.core.hookenv import (
     ERROR,
 )
 
-from charmhelpers.contrib.openstack.utils import os_release
+from charmhelpers.contrib.openstack.utils import get_host_ip, os_release
 
 
 # This is just a label and it must be consistent across
@@ -290,28 +289,6 @@ class CloudComputeContext(context.OSContextGenerator):
         return ctxt
 
 
-def get_host_ip():
-    # we used to have a charm-helper to do this, but its disappeared?
-    # taken from quantum-gateway
-
-    try:
-        import dns.resolver
-    except ImportError:
-        apt_install('python-dnspython')
-        import dns.resolver
-
-    hostname = unit_get('private-address')
-    try:
-        # Test to see if already an IPv4 address
-        socket.inet_aton(hostname)
-        return hostname
-    except socket.error:
-        answers = dns.resolver.query(hostname, 'A')
-        if answers:
-            return answers[0].address
-    return None
-
-
 class NeutronComputeContext(context.NeutronContext):
     interfaces = []
 
@@ -349,5 +326,5 @@ class NeutronComputeContext(context.NeutronContext):
 
         self._ensure_bridge()
 
-        ovs_ctxt['local_ip'] = get_host_ip()
+        ovs_ctxt['local_ip'] = get_host_ip(unit_get('private-address'))
         return ovs_ctxt
