@@ -75,7 +75,7 @@ def _neutron_url(rid, unit):
 
 class NovaComputeLibvirtContext(context.OSContextGenerator):
     '''
-    Determines various libvirt options depending on live migration
+    Determines various libvirt and nova options depending on live migration
     configuration.
     '''
     interfaces = []
@@ -95,6 +95,10 @@ class NovaComputeLibvirtContext(context.OSContextGenerator):
 
         if config('migration-auth-type') in ['none', 'None', 'ssh']:
             ctxt['listen_tls'] = 0
+
+        if config('migration-auth-type') == 'ssh':
+            # nova.conf
+            ctxt['libvirt_migration_uri'] = 'qemu+ssh://%s/system'
 
         return ctxt
 

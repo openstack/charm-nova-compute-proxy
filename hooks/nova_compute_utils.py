@@ -61,6 +61,7 @@ BASE_RESOURCE_MAP = {
                      context.ImageServiceContext(),
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),
+                     NovaComputeLibvirtContext(),
                      NovaComputeCephContext()],
     },
 }
