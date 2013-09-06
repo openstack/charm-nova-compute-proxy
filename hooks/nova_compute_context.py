@@ -98,7 +98,7 @@ class NovaComputeLibvirtContext(context.OSContextGenerator):
 
         if config('migration-auth-type') == 'ssh':
             # nova.conf
-            ctxt['libvirt_migration_uri'] = 'qemu+ssh://%s/system'
+            ctxt['live_migration_uri'] = 'qemu+ssh://%s/system'
 
         return ctxt
 
