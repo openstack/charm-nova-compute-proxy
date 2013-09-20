@@ -5,7 +5,7 @@ from base64 import b64decode
 from copy import deepcopy
 from subprocess import check_call, check_output
 
-from charmhelpers.core.host import apt_update, apt_install
+from charmhelpers.fetch import apt_update, apt_install
 
 from charmhelpers.core.hookenv import (
     config,

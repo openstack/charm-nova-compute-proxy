@@ -2,6 +2,7 @@ branch: lp:~openstack-charmers/charm-helpers/to_upstream
 destination: hooks/charmhelpers
 include:
     - core
+    - fetch
     - contrib.openstack|inc=*
     - contrib.storage
     - contrib.hahelpers:

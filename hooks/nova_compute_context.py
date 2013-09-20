@@ -3,8 +3,8 @@ from subprocess import check_call, check_output
 
 from charmhelpers.contrib.openstack import context
 
-from charmhelpers.core.host import (
-    apt_install, filter_installed_packages, service_running, service_start)
+from charmhelpers.core.host import service_running, service_start
+from charmhelpers.fetch import apt_install, filter_installed_packages
 
 from charmhelpers.core.hookenv import (
     config,
