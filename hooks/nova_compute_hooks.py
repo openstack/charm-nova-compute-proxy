@@ -44,6 +44,9 @@ from nova_compute_utils import (
     public_ssh_key,
     restart_map,
     register_configs,
+    NOVA_CONF,
+    QUANTUM_CONF, NEUTRON_CONF,
+    CEPH_CONF, CEPH_SECRET
 )
 
 from nova_compute_context import CEPH_SECRET_UUID
@@ -90,11 +93,11 @@ def amqp_changed():
     if 'amqp' not in CONFIGS.complete_contexts():
         log('amqp relation incomplete. Peer not ready?')
         return
-    CONFIGS.write('/etc/nova/nova.conf')
+    CONFIGS.write(NOVA_CONF)
     if network_manager() == 'quantum':
-        CONFIGS.write('/etc/quantum/quantum.conf')
+        CONFIGS.write(QUANTUM_CONF)
     if network_manager() == 'neutron':
-        CONFIGS.write('/etc/neutron/neutron.conf')
+        CONFIGS.write(NEUTRON_CONF)
 
 
 @hooks.hook('shared-db-relation-joined')
@@ -117,7 +120,7 @@ def db_changed():
     if 'shared-db' not in CONFIGS.complete_contexts():
         log('shared-db relation incomplete. Peer not ready?')
         return
-    CONFIGS.write('/etc/nova/nova.conf')
+    CONFIGS.write(NOVA_CONF)
     nm = network_manager()
     if nm in ['quantum', 'neutron']:
         plugin = neutron_plugin()
@@ -130,7 +133,7 @@ def image_service_changed():
     if 'image-service' not in CONFIGS.complete_contexts():
         log('image-service relation incomplete. Peer not ready?')
         return
-    CONFIGS.write('/etc/nova/nova.conf')
+    CONFIGS.write(NOVA_CONF)
 
 
 @hooks.hook('cloud-compute-relation-joined')
@@ -176,14 +179,14 @@ def ceph_changed():
     if not ensure_ceph_keyring(service=svc):
         log('Could not create ceph keyring: peer not ready?')
         return
-    CONFIGS.write('/etc/ceph/ceph.conf')
-    CONFIGS.write('/etc/ceph/secret.xml')
-    CONFIGS.write('/etc/nova/nova.conf')
+    CONFIGS.write(CEPH_CONF)
+    CONFIGS.write(CEPH_SECRET)
+    CONFIGS.write(NOVA_CONF)
 
     # With some refactoring, this can move into NovaComputeCephContext
     # and allow easily extended to support other compute flavors.
     if config('virt-type') in ['kvm', 'qemu', 'lxc']:
-        create_libvirt_secret(secret_file='/etc/ceph/secret.xml',
+        create_libvirt_secret(secret_file=CEPH_SECRET,
                               secret_uuid=CEPH_SECRET_UUID,
                               key=relation_get('key'))
 

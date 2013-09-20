@@ -41,20 +41,25 @@ BASE_PACKAGES = [
     'genisoimage',  # was missing as a package dependency until raring.
 ]
 
+QEMU_CONF = '/etc/libvirt/qemu.conf'
+LIBVIRTD_CONF = '/etc/libvirt/libvirtd.conf'
+LIBVIRT_BIN = '/etc/default/libvirt-bin'
+NOVA_CONF = '/etc/nova/nova.conf'
+
 BASE_RESOURCE_MAP = {
-    '/etc/libvirt/qemu.conf': {
+    QEMU_CONF: {
         'services': ['libvirt-bin'],
         'contexts': [],
     },
-    '/etc/libvirt/libvirtd.conf': {
+    LIBVIRTD_CONF: {
         'services': ['libvirt-bin'],
         'contexts': [NovaComputeLibvirtContext()],
     },
-    '/etc/default/libvirt-bin': {
+    LIBVIRT_BIN: {
         'services': ['libvirt-bin'],
         'contexts': [NovaComputeLibvirtContext()],
     },
-    '/etc/nova/nova.conf': {
+    NOVA_CONF: {
         'services': ['nova-compute'],
         'contexts': [context.AMQPContext(),
                      context.SharedDBContext(relation_prefix='nova'),
@@ -66,26 +71,33 @@ BASE_RESOURCE_MAP = {
     },
 }
 
+CEPH_CONF = '/etc/ceph/ceph.conf'
+CEPH_SECRET = '/etc/ceph/secret.xml'
+
 CEPH_RESOURCES = {
-    '/etc/ceph/ceph.conf': {
+    CEPH_CONF: {
         'contexts': [NovaComputeCephContext()],
         'services': [],
     },
-    '/etc/ceph/secret.xml': {
+    CEPH_SECRET: {
         'contexts': [NovaComputeCephContext()],
         'services': [],
     }
 }
 
+QUANTUM_CONF = '/etc/quantum/quantum.conf'
+
 QUANTUM_RESOURCES = {
-    '/etc/quantum/quantum.conf': {
+    QUANTUM_CONF: {
         'services': [],
         'contexts': [context.AMQPContext()],
     }
 }
 
+NEUTRON_CONF = '/etc/neutron/neutron.conf'
+
 NEUTRON_RESOURCES = {
-    '/etc/neutron/neutron.conf': {
+    NEUTRON_CONF: {
         'services': [],
         'contexts': [context.AMQPContext()],
     }
@@ -128,8 +140,7 @@ def resource_map():
             nm_rsc = NEUTRON_RESOURCES
         resource_map.update(nm_rsc)
 
-        resource_map['/etc/nova/nova.conf']['contexts'].append(
-            NeutronComputeContext())
+        resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
 
         plugin = neutron_plugin()
         if plugin:
@@ -337,7 +348,6 @@ def do_openstack_upgrade(configs):
     # set CONFIGS to load templates from new release and regenerate config
     configs.set_release(openstack_release=new_os_rel)
     configs.write_all()
-    pass
 
 
 def import_keystone_ca_cert():
@@ -359,7 +369,7 @@ def create_libvirt_secret(secret_file, secret_uuid, key):
             level=DEBUG)
         return
     log('Defining new libvirt secret for uuid %s.' % secret_uuid)
-    cmd = ['virsh', 'secret-define', '--file', '/etc/ceph/secret.xml']
+    cmd = ['virsh', 'secret-define', '--file', secret_file]
     check_call(cmd)
     cmd = ['virsh', 'secret-set-value', '--secret', secret_uuid,
            '--base64', key]
