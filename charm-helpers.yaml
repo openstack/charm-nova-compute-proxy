@@ -7,5 +7,4 @@ include:
     - contrib.storage
     - contrib.hahelpers:
         - apache
-        - ceph
         - cluster
