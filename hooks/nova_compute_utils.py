@@ -90,7 +90,7 @@ QUANTUM_CONF = '/etc/quantum/quantum.conf'
 QUANTUM_RESOURCES = {
     QUANTUM_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext()],
+        'contexts': [context.AMQPContext(), NeutronComputeContext()],
     }
 }
 
@@ -99,7 +99,7 @@ NEUTRON_CONF = '/etc/neutron/neutron.conf'
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext()],
+        'contexts': [context.AMQPContext(), NeutronComputeContext()],
     }
 }
 
