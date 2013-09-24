@@ -29,6 +29,7 @@ from charmhelpers.contrib.openstack.utils import (
     openstack_upgrade_available,
 )
 
+from charmhelpers.contrib.storage.linux.ceph import ensure_ceph_keyring
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 
 from nova_compute_utils import (
@@ -50,10 +51,6 @@ from nova_compute_utils import (
 )
 
 from nova_compute_context import CEPH_SECRET_UUID
-
-from misc_utils import (
-    ensure_ceph_keyring,
-)
 
 hooks = Hooks()
 CONFIGS = register_configs()
