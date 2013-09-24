@@ -127,7 +127,7 @@ def resource_map():
     # FlatDHCPManager only requires some extra packages.
     if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
             config('multi-host').lower() == 'yes'):
-        resource_map['/etc/nova/nova.conf']['services'].extend(
+        resource_map[NOVA_CONF]['services'].extend(
             ['nova-api', 'nova-network']
         )
 
@@ -319,9 +319,9 @@ def configure_live_migration(configs=None):
     # dont think we need this
     return
     configs = configs or register_configs()
-    configs.write('/etc/libvirt/libvirtd.conf')
-    configs.write('/etc/default/libvirt-bin')
-    configs.write('/etc/nova/nova.conf')
+    configs.write(LIBVIRTD_CONF)
+    configs.write(LIBVIRT_BIN)
+    configs.write(NOVA_CONF)
 
     if not migration_enabled():
         return
