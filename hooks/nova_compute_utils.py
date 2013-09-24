@@ -237,7 +237,7 @@ def _network_config():
 
 
 def neutron_plugin():
-    return (_network_config().get('quantum_plugin') or
+    return (_network_config().get('neutron_plugin') or
             _network_config().get('quantum_plugin'))
 
 
