@@ -1,9 +1,9 @@
 from mock import patch, MagicMock, call
 
-from unit_tests.test_utils import CharmTestCase, patch_open
+from test_utils import CharmTestCase, patch_open
 
 
-import hooks.nova_compute_utils as utils
+import nova_compute_utils as utils
 
 TO_PATCH = [
     'config',
@@ -212,7 +212,7 @@ class NovaComputeUtilsTests(CharmTestCase):
             _file.write.assert_called_with('foo_cert\n')
         check_call.assert_called_with(['update-ca-certificates'])
 
-    @patch('hooks.charmhelpers.contrib.openstack.templating.OSConfigRenderer')
+    @patch('charmhelpers.contrib.openstack.templating.OSConfigRenderer')
     @patch.object(utils, 'quantum_enabled')
     @patch.object(utils, 'resource_map')
     def test_register_configs(self, resource_map, quantum, renderer):

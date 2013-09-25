@@ -1,9 +1,9 @@
 from mock import patch
-from unit_tests.test_utils import CharmTestCase
+from test_utils import CharmTestCase
 
 from charmhelpers.contrib.openstack.context import OSContextError
 
-import hooks.nova_compute_context as context
+import nova_compute_context as context
 
 TO_PATCH = [
     'apt_install',
