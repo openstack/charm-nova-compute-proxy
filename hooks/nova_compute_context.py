@@ -18,6 +18,7 @@ from charmhelpers.core.hookenv import (
 )
 
 from charmhelpers.contrib.openstack.utils import get_host_ip, os_release
+from charmhelpers.contrib.network.ovs import add_bridge
 
 
 # This is just a label and it must be consistent across
@@ -311,14 +312,7 @@ class NeutronComputeContext(context.NeutronContext):
     def _ensure_bridge(self):
         if not service_running('openvswitch-switch'):
             service_start('openvswitch-switch')
-
-        ovs_output = check_output(['ovs-vsctl', 'show'])
-        for ln in ovs_output.split('\n'):
-            if OVS_BRIDGE in ln.strip():
-                log('Found OVS bridge: %s.' % OVS_BRIDGE)
-                return
-        log('Creating new OVS bridge: %s.' % OVS_BRIDGE)
-        check_call(['ovs-vsctl', 'add-br', OVS_BRIDGE])
+        add_bridge(OVS_BRIDGE)
 
     def ovs_ctxt(self):
         # In addition to generating config context, ensure the OVS service
