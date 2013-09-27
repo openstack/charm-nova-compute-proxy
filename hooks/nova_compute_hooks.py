@@ -31,6 +31,7 @@ from charmhelpers.contrib.openstack.utils import (
 
 from charmhelpers.contrib.storage.linux.ceph import ensure_ceph_keyring
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
+from charmhelpers.payload.execd import execd_preinstall
 
 from nova_compute_utils import (
     create_libvirt_secret,
@@ -58,6 +59,7 @@ CONFIGS = register_configs()
 
 @hooks.hook()
 def install():
+    execd_preinstall()
     configure_installation_source(config('openstack-origin'))
     apt_update()
     apt_install(determine_packages(), fatal=True)

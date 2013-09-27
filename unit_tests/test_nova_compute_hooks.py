@@ -50,6 +50,7 @@ TO_PATCH = [
     'register_configs',
     # misc_utils
     'ensure_ceph_keyring',
+    'execd_preinstall'
 ]
 
 
@@ -72,6 +73,7 @@ class NovaComputeRelationsTests(CharmTestCase):
         self.configure_installation_source.assert_called_with(repo)
         self.assertTrue(self.apt_update.called)
         self.apt_install.assert_called_with(['foo', 'bar'], fatal=True)
+        self.execd_preinstall.assert_called()
 
     def test_config_changed_with_upgrade(self):
         self.openstack_upgrade_available.return_value = True
