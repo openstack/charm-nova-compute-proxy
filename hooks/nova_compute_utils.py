@@ -113,6 +113,10 @@ VIRT_TYPES = {
 }
 
 
+def ceph_config_file():
+    return CHARM_CEPH_CONF.format(service_name())
+
+
 def resource_map():
     '''
     Dynamically generate a map of resources that will be managed for a single
@@ -158,18 +162,17 @@ def resource_map():
     if relation_ids('ceph'):
         # Add charm ceph configuration to resources and
         # ensure directory actually exists
-        _charm_ceph_conf = CHARM_CEPH_CONF.format(service_name())
-        mkdir(os.path.dirname(_charm_ceph_conf))
+        mkdir(os.path.dirname(ceph_config_file()))
         mkdir(os.path.dirname(CEPH_CONF))
         # Install ceph config as an alternative for co-location with
         # ceph and ceph-osd charms - nova-compute ceph.conf will be
         # lower priority that both of these but thats OK
-        if not os.path.exists(_charm_ceph_conf):
+        if not os.path.exists(ceph_config_file()):
             # touch file for pre-templated generation
-            open(_charm_ceph_conf, 'w').close()
+            open(ceph_config_file(), 'w').close()
         install_alternative(os.path.basename(CEPH_CONF),
-                            CEPH_CONF, _charm_ceph_conf)
-        CEPH_RESOURCES[_charm_ceph_conf] = {
+                            CEPH_CONF, ceph_config_file())
+        CEPH_RESOURCES[ceph_config_file()] = {
             'contexts': [NovaComputeCephContext()],
             'services': [],
         }
