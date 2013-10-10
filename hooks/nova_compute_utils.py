@@ -164,6 +164,9 @@ def resource_map():
         # Install ceph config as an alternative for co-location with
         # ceph and ceph-osd charms - nova-compute ceph.conf will be
         # lower priority that both of these but thats OK
+        if not os.path.exists(_charm_ceph_conf):
+            # touch file for pre-templated generation
+            open(_charm_ceph_conf, 'w').close()
         install_alternative(os.path.basename(CEPH_CONF),
                             CEPH_CONF, _charm_ceph_conf)
         CEPH_RESOURCES[_charm_ceph_conf] = {
