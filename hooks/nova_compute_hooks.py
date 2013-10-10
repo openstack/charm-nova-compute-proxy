@@ -48,7 +48,7 @@ from nova_compute_utils import (
     register_configs,
     NOVA_CONF,
     QUANTUM_CONF, NEUTRON_CONF,
-    CEPH_CONF, CEPH_SECRET
+    CHARM_CEPH_CONF, CEPH_SECRET
 )
 
 from nova_compute_context import CEPH_SECRET_UUID
@@ -178,7 +178,7 @@ def ceph_changed():
     if not ensure_ceph_keyring(service=svc):
         log('Could not create ceph keyring: peer not ready?')
         return
-    CONFIGS.write(CEPH_CONF)
+    CONFIGS.write(CHARM_CEPH_CONF)
     CONFIGS.write(CEPH_SECRET)
     CONFIGS.write(NOVA_CONF)
 
