@@ -178,7 +178,7 @@ def ceph_changed():
     if not ensure_ceph_keyring(service=svc):
         log('Could not create ceph keyring: peer not ready?')
         return
-    CONFIGS.write(CHARM_CEPH_CONF)
+    CONFIGS.write(CHARM_CEPH_CONF.format(service_name()))
     CONFIGS.write(CEPH_SECRET)
     CONFIGS.write(NOVA_CONF)
 
