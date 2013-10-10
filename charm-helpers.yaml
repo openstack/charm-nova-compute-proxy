@@ -1,4 +1,4 @@
-branch: lp:~openstack-charmers/charm-helpers/to_upstream
+branch: lp:~openstack-charmers/charm-helpers/os-alternatives
 destination: hooks/charmhelpers
 include:
     - core
