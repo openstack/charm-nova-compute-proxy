@@ -134,16 +134,18 @@ def resource_map():
     # Neutron/quantum requires additional contexts, as well as new resources
     # depending on the plugin used.
     if net_manager in ['neutron', 'quantum']:
+        plugin = neutron_plugin()
+
         if net_manager == 'quantum':
             nm_rsc = QUANTUM_RESOURCES
         if net_manager == 'neutron':
             nm_rsc = NEUTRON_RESOURCES
-        resource_map.update(nm_rsc)
+        if plugin == 'ovs':
+            resource_map.update(nm_rsc)
 
         resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
 
-        plugin = neutron_plugin()
-        if plugin:
+        if plugin == 'ovs':
             conf = neutron_plugin_attribute(plugin, 'config', net_manager)
             svcs = neutron_plugin_attribute(plugin, 'services', net_manager)
             ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
