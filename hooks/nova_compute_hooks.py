@@ -105,7 +105,8 @@ def db_joined(rid=None):
                  nova_database=config('database'),
                  nova_username=config('database-user'),
                  nova_hostname=unit_get('private-address'))
-    if network_manager() in ['quantum', 'neutron']:
+    if (network_manager() in ['quantum', 'neutron']
+            and neutron_plugin() == 'ovs'):
         # XXX: Renaming relations from quantum_* to neutron_* here.
         relation_set(relation_id=rid,
                      neutron_database=config('neutron-database'),
@@ -121,8 +122,8 @@ def db_changed():
         return
     CONFIGS.write(NOVA_CONF)
     nm = network_manager()
-    if nm in ['quantum', 'neutron']:
-        plugin = neutron_plugin()
+    plugin = neutron_plugin()
+    if nm in ['quantum', 'neutron'] and plugin == 'ovs':
         CONFIGS.write(neutron_plugin_attribute(plugin, 'config', nm))
 
 
@@ -156,7 +157,8 @@ def compute_changed():
     CONFIGS.write_all()
     import_authorized_keys()
     import_keystone_ca_cert()
-    if network_manager() in ['quantum', 'neutron']:
+    if (network_manager() in ['quantum', 'neutron']
+            and neutron_plugin() == 'ovs'):
         # in case we already have a database relation, need to request
         # access to the additional neutron database.
         [db_joined(rid) for rid in relation_ids('shared-db')]

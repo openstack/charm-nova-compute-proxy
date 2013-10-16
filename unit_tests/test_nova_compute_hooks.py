@@ -146,9 +146,10 @@ class NovaComputeRelationsTests(CharmTestCase):
                                              nova_hostname='nova.foohost.com')
         self.unit_get.assert_called_with('private-address')
 
-    def test_db_joined_quantum(self):
+    def test_db_joined_quantum_ovs(self):
         self.unit_get.return_value = 'nova.foohost.com'
         self.network_manager.return_value = 'quantum'
+        self.neutron_plugin.return_value = 'ovs'
         hooks.db_joined(rid='shared-db:0')
         calls = [call(nova_database='nova',
                       nova_username='nova',
@@ -158,6 +159,21 @@ class NovaComputeRelationsTests(CharmTestCase):
                       neutron_username='neutron',
                       neutron_hostname='nova.foohost.com',
                       relation_id='shared-db:0')]
+        [self.assertIn(c, self.relation_set.call_args_list)
+         for c in calls]
+        self.unit_get.assert_called_with('private-address')
+
+    def test_db_joined_quantum_nvp(self):
+        self.unit_get.return_value = 'nova.foohost.com'
+        self.network_manager.return_value = 'quantum'
+        self.neutron_plugin.return_value = 'nvp'
+        hooks.db_joined(rid='shared-db:0')
+        calls = [call(nova_database='nova',
+                      nova_username='nova',
+                      nova_hostname='nova.foohost.com',
+                      relation_id='shared-db:0')]
+        # NVP plugin requires no DB access - check it was not
+        # requested
         [self.assertIn(c, self.relation_set.call_args_list)
          for c in calls]
         self.unit_get.assert_called_with('private-address')
@@ -186,10 +202,20 @@ class NovaComputeRelationsTests(CharmTestCase):
                           configs.write.call_args_list)
 
     @patch.object(hooks, 'CONFIGS')
-    def test_db_changed_with_data_and_quantum(self, configs):
+    def test_db_changed_with_data_and_quantum_ovs(self, configs):
         self.neutron_plugin_attribute.return_value = '/etc/quantum/plugin.conf'
+        self.neutron_plugin.return_value = 'ovs'
         self._shared_db_test(configs, quantum=True)
         ex = [call('/etc/nova/nova.conf'), call('/etc/quantum/plugin.conf')]
+        self.assertEquals(ex, configs.write.call_args_list)
+
+    @patch.object(hooks, 'CONFIGS')
+    def test_db_changed_with_data_and_quantum_nvp(self, configs):
+        self.neutron_plugin_attribute.return_value = '/etc/quantum/plugin.conf'
+        self.neutron_plugin.return_value = 'nvp'
+        self._shared_db_test(configs, quantum=True)
+        ex = [call('/etc/nova/nova.conf')]
+        # NVP has no compute agent for neutron; check no config files generated
         self.assertEquals(ex, configs.write.call_args_list)
 
     @patch.object(hooks, 'CONFIGS')
