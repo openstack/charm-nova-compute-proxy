@@ -122,6 +122,7 @@ def resource_map():
     # TODO: Cache this on first call?
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     net_manager = network_manager()
+    plugin = neutron_plugin()
 
     # Network manager gets set late by the cloud-compute interface.
     # FlatDHCPManager only requires some extra packages.
@@ -133,30 +134,27 @@ def resource_map():
 
     # Neutron/quantum requires additional contexts, as well as new resources
     # depending on the plugin used.
-    if net_manager in ['neutron', 'quantum']:
-        plugin = neutron_plugin()
-
+    # NOTE(james-page): only required for ovs plugin right now
+    if net_manager in ['neutron', 'quantum'] and plugin == 'ovs':
         if net_manager == 'quantum':
             nm_rsc = QUANTUM_RESOURCES
         if net_manager == 'neutron':
             nm_rsc = NEUTRON_RESOURCES
-        if plugin == 'ovs':
-            resource_map.update(nm_rsc)
+        resource_map.update(nm_rsc)
 
         resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
 
-        if plugin == 'ovs':
-            conf = neutron_plugin_attribute(plugin, 'config', net_manager)
-            svcs = neutron_plugin_attribute(plugin, 'services', net_manager)
-            ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
-                     or [])
-            resource_map[conf] = {}
-            resource_map[conf]['services'] = svcs
-            resource_map[conf]['contexts'] = ctxts
-            resource_map[conf]['contexts'].append(NeutronComputeContext())
+        conf = neutron_plugin_attribute(plugin, 'config', net_manager)
+        svcs = neutron_plugin_attribute(plugin, 'services', net_manager)
+        ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
+                 or [])
+        resource_map[conf] = {}
+        resource_map[conf]['services'] = svcs
+        resource_map[conf]['contexts'] = ctxts
+        resource_map[conf]['contexts'].append(NeutronComputeContext())
 
-            # associate the plugin agent with main network manager config(s)
-            [resource_map[nmc]['services'].extend(svcs) for nmc in nm_rsc]
+        # associate the plugin agent with main network manager config(s)
+        [resource_map[nmc]['services'].extend(svcs) for nmc in nm_rsc]
 
     if relation_ids('ceph'):
         resource_map.update(CEPH_RESOURCES)
