@@ -81,7 +81,6 @@ def config_changed():
 
 
 @hooks.hook('amqp-relation-joined')
-@restart_on_change(restart_map())
 def amqp_joined(relation_id=None):
     relation_set(relation_id=relation_id,
                  username=config('rabbit-user'),
