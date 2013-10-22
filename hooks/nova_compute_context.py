@@ -1,6 +1,4 @@
 
-from subprocess import check_call, check_output
-
 from charmhelpers.contrib.openstack import context
 
 from charmhelpers.core.host import service_running, service_start
