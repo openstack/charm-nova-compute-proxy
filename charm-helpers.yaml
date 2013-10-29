@@ -1,4 +1,7 @@
-branch: lp:~james-page/charm-helpers/nvp-updates
+# NOTE: Merge conflicts.
+#branch: lp:~james-page/charm-helpers/nvp-updates
+#branch: lp:~openstack-charmers/charm-helpers/os-alternatives
+branch: lp:charm-helpers
 destination: hooks/charmhelpers
 include:
     - core

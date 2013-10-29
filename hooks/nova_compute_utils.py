@@ -6,7 +6,7 @@ from copy import deepcopy
 from subprocess import check_call, check_output
 
 from charmhelpers.fetch import apt_update, apt_install
-
+from charmhelpers.core.host import mkdir
 from charmhelpers.core.hookenv import (
     config,
     log,
@@ -14,10 +14,12 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     relation_get,
     DEBUG,
+    service_name
 )
 
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.openstack import templating, context
+from charmhelpers.contrib.openstack.alternatives import install_alternative
 
 from charmhelpers.contrib.openstack.utils import (
     configure_installation_source,
@@ -72,13 +74,10 @@ BASE_RESOURCE_MAP = {
 }
 
 CEPH_CONF = '/etc/ceph/ceph.conf'
+CHARM_CEPH_CONF = '/var/lib/charm/{}/ceph.conf'
 CEPH_SECRET = '/etc/ceph/secret.xml'
 
 CEPH_RESOURCES = {
-    CEPH_CONF: {
-        'contexts': [NovaComputeCephContext()],
-        'services': [],
-    },
     CEPH_SECRET: {
         'contexts': [NovaComputeCephContext()],
         'services': [],
@@ -112,6 +111,10 @@ VIRT_TYPES = {
     'uml': ['nova-compute-uml'],
     'lxc': ['nova-compute-lxc'],
 }
+
+
+def ceph_config_file():
+    return CHARM_CEPH_CONF.format(service_name())
 
 
 def resource_map():
@@ -157,6 +160,22 @@ def resource_map():
         [resource_map[nmc]['services'].extend(svcs) for nmc in nm_rsc]
 
     if relation_ids('ceph'):
+        # Add charm ceph configuration to resources and
+        # ensure directory actually exists
+        mkdir(os.path.dirname(ceph_config_file()))
+        mkdir(os.path.dirname(CEPH_CONF))
+        # Install ceph config as an alternative for co-location with
+        # ceph and ceph-osd charms - nova-compute ceph.conf will be
+        # lower priority that both of these but thats OK
+        if not os.path.exists(ceph_config_file()):
+            # touch file for pre-templated generation
+            open(ceph_config_file(), 'w').close()
+        install_alternative(os.path.basename(CEPH_CONF),
+                            CEPH_CONF, ceph_config_file())
+        CEPH_RESOURCES[ceph_config_file()] = {
+            'contexts': [NovaComputeCephContext()],
+            'services': [],
+        }
         resource_map.update(CEPH_RESOURCES)
 
     return resource_map

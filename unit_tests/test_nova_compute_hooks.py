@@ -289,15 +289,18 @@ class NovaComputeRelationsTests(CharmTestCase):
             'Could not create ceph keyring: peer not ready?'
         )
 
+    @patch.object(utils, 'service_name')
     @patch.object(hooks, 'CONFIGS')
-    def test_ceph_changed_with_key_and_relation_data(self, configs):
+    def test_ceph_changed_with_key_and_relation_data(self, configs,
+                                                     service_name):
         configs.complete_contexts = MagicMock()
         configs.complete_contexts.return_value = ['ceph']
         configs.write = MagicMock()
+        service_name.return_value = 'nova-compute'
         self.ensure_ceph_keyring.return_value = True
         hooks.ceph_changed()
         ex = [
-            call('/etc/ceph/ceph.conf'),
+            call('/var/lib/charm/nova-compute/ceph.conf'),
             call('/etc/ceph/secret.xml'),
             call('/etc/nova/nova.conf'),
         ]
