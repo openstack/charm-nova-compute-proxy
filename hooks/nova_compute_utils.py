@@ -138,26 +138,27 @@ def resource_map():
     # Neutron/quantum requires additional contexts, as well as new resources
     # depending on the plugin used.
     # NOTE(james-page): only required for ovs plugin right now
-    if net_manager in ['neutron', 'quantum'] and plugin == 'ovs':
-        if net_manager == 'quantum':
-            nm_rsc = QUANTUM_RESOURCES
-        if net_manager == 'neutron':
-            nm_rsc = NEUTRON_RESOURCES
-        resource_map.update(nm_rsc)
+    if net_manager in ['neutron', 'quantum']:
+        if plugin == 'ovs':
+            if net_manager == 'quantum':
+                nm_rsc = QUANTUM_RESOURCES
+            if net_manager == 'neutron':
+                nm_rsc = NEUTRON_RESOURCES
+            resource_map.update(nm_rsc)
+
+            conf = neutron_plugin_attribute(plugin, 'config', net_manager)
+            svcs = neutron_plugin_attribute(plugin, 'services', net_manager)
+            ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
+                     or [])
+            resource_map[conf] = {}
+            resource_map[conf]['services'] = svcs
+            resource_map[conf]['contexts'] = ctxts
+            resource_map[conf]['contexts'].append(NeutronComputeContext())
+
+            # associate the plugin agent with main network manager config(s)
+            [resource_map[nmc]['services'].extend(svcs) for nmc in nm_rsc]
 
         resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
-
-        conf = neutron_plugin_attribute(plugin, 'config', net_manager)
-        svcs = neutron_plugin_attribute(plugin, 'services', net_manager)
-        ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
-                 or [])
-        resource_map[conf] = {}
-        resource_map[conf]['services'] = svcs
-        resource_map[conf]['contexts'] = ctxts
-        resource_map[conf]['contexts'].append(NeutronComputeContext())
-
-        # associate the plugin agent with main network manager config(s)
-        [resource_map[nmc]['services'].extend(svcs) for nmc in nm_rsc]
 
     if relation_ids('ceph'):
         # Add charm ceph configuration to resources and
