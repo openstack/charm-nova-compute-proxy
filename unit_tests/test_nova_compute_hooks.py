@@ -122,6 +122,7 @@ class NovaComputeRelationsTests(CharmTestCase):
         configs.write = MagicMock()
         if quantum:
             self.network_manager.return_value = 'quantum'
+            self.neutron_plugin.return_value = 'ovs'
         hooks.amqp_changed()
 
     @patch.object(hooks, 'CONFIGS')
