@@ -105,7 +105,8 @@ class NovaComputeRelationsTests(CharmTestCase):
 
     def test_amqp_joined(self):
         hooks.amqp_joined()
-        self.relation_set.assert_called_with(username='nova', vhost='nova')
+        self.relation_set.assert_called_with(username='nova', vhost='openstack',
+                                             relation_id=None)
 
     @patch.object(hooks, 'CONFIGS')
     def test_amqp_changed_missing_relation_data(self, configs):

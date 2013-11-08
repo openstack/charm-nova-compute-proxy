@@ -23,7 +23,7 @@ options:
     type: string
     description: Username used to access rabbitmq queue
   rabbit-vhost:
-    default: nova
+    default: openstack
     type: string
     decsription: Rabbitmq vhost
   database-user:
