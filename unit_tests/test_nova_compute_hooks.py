@@ -30,7 +30,7 @@ TO_PATCH = [
     'apt_update',
     'filter_installed_packages',
     'restart_on_change',
-    #charmhelpers.contrib.openstack.utils
+    # charmhelpers.contrib.openstack.utils
     'configure_installation_source',
     'openstack_upgrade_available',
     # nova_compute_utils
@@ -59,6 +59,7 @@ def fake_filter(packages):
 
 
 class NovaComputeRelationsTests(CharmTestCase):
+
     def setUp(self):
         super(NovaComputeRelationsTests, self).setUp(hooks,
                                                      TO_PATCH)
@@ -105,8 +106,9 @@ class NovaComputeRelationsTests(CharmTestCase):
 
     def test_amqp_joined(self):
         hooks.amqp_joined()
-        self.relation_set.assert_called_with(username='nova', vhost='openstack',
-                                             relation_id=None)
+        self.relation_set.assert_called_with(
+            username='nova', vhost='openstack',
+            relation_id=None)
 
     @patch.object(hooks, 'CONFIGS')
     def test_amqp_changed_missing_relation_data(self, configs):
@@ -123,6 +125,7 @@ class NovaComputeRelationsTests(CharmTestCase):
         configs.write = MagicMock()
         if quantum:
             self.network_manager.return_value = 'quantum'
+            self.neutron_plugin.return_value = 'ovs'
         hooks.amqp_changed()
 
     @patch.object(hooks, 'CONFIGS')
@@ -147,9 +150,10 @@ class NovaComputeRelationsTests(CharmTestCase):
                                              nova_hostname='nova.foohost.com')
         self.unit_get.assert_called_with('private-address')
 
-    def test_db_joined_quantum(self):
+    def test_db_joined_quantum_ovs(self):
         self.unit_get.return_value = 'nova.foohost.com'
         self.network_manager.return_value = 'quantum'
+        self.neutron_plugin.return_value = 'ovs'
         hooks.db_joined(rid='shared-db:0')
         calls = [call(nova_database='nova',
                       nova_username='nova',
@@ -159,6 +163,21 @@ class NovaComputeRelationsTests(CharmTestCase):
                       neutron_username='neutron',
                       neutron_hostname='nova.foohost.com',
                       relation_id='shared-db:0')]
+        [self.assertIn(c, self.relation_set.call_args_list)
+         for c in calls]
+        self.unit_get.assert_called_with('private-address')
+
+    def test_db_joined_quantum_nvp(self):
+        self.unit_get.return_value = 'nova.foohost.com'
+        self.network_manager.return_value = 'quantum'
+        self.neutron_plugin.return_value = 'nvp'
+        hooks.db_joined(rid='shared-db:0')
+        calls = [call(nova_database='nova',
+                      nova_username='nova',
+                      nova_hostname='nova.foohost.com',
+                      relation_id='shared-db:0')]
+        # NVP plugin requires no DB access - check it was not
+        # requested
         [self.assertIn(c, self.relation_set.call_args_list)
          for c in calls]
         self.unit_get.assert_called_with('private-address')
@@ -187,10 +206,20 @@ class NovaComputeRelationsTests(CharmTestCase):
                           configs.write.call_args_list)
 
     @patch.object(hooks, 'CONFIGS')
-    def test_db_changed_with_data_and_quantum(self, configs):
+    def test_db_changed_with_data_and_quantum_ovs(self, configs):
         self.neutron_plugin_attribute.return_value = '/etc/quantum/plugin.conf'
+        self.neutron_plugin.return_value = 'ovs'
         self._shared_db_test(configs, quantum=True)
         ex = [call('/etc/nova/nova.conf'), call('/etc/quantum/plugin.conf')]
+        self.assertEquals(ex, configs.write.call_args_list)
+
+    @patch.object(hooks, 'CONFIGS')
+    def test_db_changed_with_data_and_quantum_nvp(self, configs):
+        self.neutron_plugin_attribute.return_value = '/etc/quantum/plugin.conf'
+        self.neutron_plugin.return_value = 'nvp'
+        self._shared_db_test(configs, quantum=True)
+        ex = [call('/etc/nova/nova.conf')]
+        # NVP has no compute agent for neutron; check no config files generated
         self.assertEquals(ex, configs.write.call_args_list)
 
     @patch.object(hooks, 'CONFIGS')
@@ -264,15 +293,18 @@ class NovaComputeRelationsTests(CharmTestCase):
             'Could not create ceph keyring: peer not ready?'
         )
 
+    @patch.object(utils, 'service_name')
     @patch.object(hooks, 'CONFIGS')
-    def test_ceph_changed_with_key_and_relation_data(self, configs):
+    def test_ceph_changed_with_key_and_relation_data(self, configs,
+                                                     service_name):
         configs.complete_contexts = MagicMock()
         configs.complete_contexts.return_value = ['ceph']
         configs.write = MagicMock()
+        service_name.return_value = 'nova-compute'
         self.ensure_ceph_keyring.return_value = True
         hooks.ceph_changed()
         ex = [
-            call('/etc/ceph/ceph.conf'),
+            call('/var/lib/charm/nova-compute/ceph.conf'),
             call('/etc/ceph/secret.xml'),
             call('/etc/nova/nova.conf'),
         ]

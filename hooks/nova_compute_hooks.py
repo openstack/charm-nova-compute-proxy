@@ -48,7 +48,7 @@ from nova_compute_utils import (
     register_configs,
     NOVA_CONF,
     QUANTUM_CONF, NEUTRON_CONF,
-    CEPH_CONF, CEPH_SECRET
+    ceph_config_file, CEPH_SECRET
 )
 
 from nova_compute_context import CEPH_SECRET_UUID
@@ -94,9 +94,10 @@ def amqp_changed():
         log('amqp relation incomplete. Peer not ready?')
         return
     CONFIGS.write(NOVA_CONF)
-    if network_manager() == 'quantum':
+
+    if network_manager() == 'quantum' and neutron_plugin() == 'ovs':
         CONFIGS.write(QUANTUM_CONF)
-    if network_manager() == 'neutron':
+    if network_manager() == 'neutron' and neutron_plugin() == 'ovs':
         CONFIGS.write(NEUTRON_CONF)
 
 
@@ -106,7 +107,8 @@ def db_joined(rid=None):
                  nova_database=config('database'),
                  nova_username=config('database-user'),
                  nova_hostname=unit_get('private-address'))
-    if network_manager() in ['quantum', 'neutron']:
+    if (network_manager() in ['quantum', 'neutron']
+            and neutron_plugin() == 'ovs'):
         # XXX: Renaming relations from quantum_* to neutron_* here.
         relation_set(relation_id=rid,
                      neutron_database=config('neutron-database'),
@@ -122,8 +124,8 @@ def db_changed():
         return
     CONFIGS.write(NOVA_CONF)
     nm = network_manager()
-    if nm in ['quantum', 'neutron']:
-        plugin = neutron_plugin()
+    plugin = neutron_plugin()
+    if nm in ['quantum', 'neutron'] and plugin == 'ovs':
         CONFIGS.write(neutron_plugin_attribute(plugin, 'config', nm))
 
 
@@ -157,7 +159,8 @@ def compute_changed():
     CONFIGS.write_all()
     import_authorized_keys()
     import_keystone_ca_cert()
-    if network_manager() in ['quantum', 'neutron']:
+    if (network_manager() in ['quantum', 'neutron']
+            and neutron_plugin() == 'ovs'):
         # in case we already have a database relation, need to request
         # access to the additional neutron database.
         [db_joined(rid) for rid in relation_ids('shared-db')]
@@ -179,7 +182,7 @@ def ceph_changed():
     if not ensure_ceph_keyring(service=svc):
         log('Could not create ceph keyring: peer not ready?')
         return
-    CONFIGS.write(CEPH_CONF)
+    CONFIGS.write(ceph_config_file())
     CONFIGS.write(CEPH_SECRET)
     CONFIGS.write(NOVA_CONF)
 

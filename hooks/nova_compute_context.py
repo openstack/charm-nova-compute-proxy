@@ -273,6 +273,14 @@ class CloudComputeContext(context.OSContextGenerator):
             self.network_manager)
         return ctxt
 
+    def restart_trigger(self):
+        rt = None
+        for rid in relation_ids('cloud-compute'):
+            for unit in related_units(rid):
+                rt = relation_get('restart_trigger', rid=rid, unit=unit)
+                if rt:
+                    return rt
+
     def __call__(self):
         rids = relation_ids('cloud-compute')
         if not rids:
@@ -288,6 +296,9 @@ class CloudComputeContext(context.OSContextGenerator):
         vol_service = self.volume_context()
         if vol_service:
             ctxt['volume_service'] = vol_service
+
+        if self.restart_trigger():
+            ctxt['restart_trigger'] = self.restart_trigger()
 
         return ctxt
 

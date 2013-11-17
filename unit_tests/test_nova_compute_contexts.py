@@ -55,6 +55,7 @@ def fake_log(msg, level=None):
 
 
 class NovaComputeContextTests(CharmTestCase):
+
     def setUp(self):
         super(NovaComputeContextTests, self).setUp(context, TO_PATCH)
         self.relation_get.side_effect = self.test_relation.get
@@ -65,6 +66,20 @@ class NovaComputeContextTests(CharmTestCase):
         self.relation_ids.return_value = []
         cloud_compute = context.CloudComputeContext()
         self.assertEquals({}, cloud_compute())
+
+    @patch.object(context, '_network_manager')
+    def test_cloud_compute_context_restart_trigger(self, nm):
+        nm.return_value = None
+        cloud_compute = context.CloudComputeContext()
+        with patch.object(cloud_compute, 'restart_trigger') as rt:
+            rt.return_value = 'footrigger'
+            ctxt = cloud_compute()
+        self.assertEquals(ctxt.get('restart_trigger'), 'footrigger')
+
+        with patch.object(cloud_compute, 'restart_trigger') as rt:
+            rt.return_value = None
+            ctxt = cloud_compute()
+        self.assertEquals(ctxt.get('restart_trigger'), None)
 
     @patch.object(context, '_network_manager')
     def test_cloud_compute_volume_context_cinder(self, netman):

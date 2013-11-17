@@ -6,7 +6,7 @@ from copy import deepcopy
 from subprocess import check_call, check_output
 
 from charmhelpers.fetch import apt_update, apt_install
-
+from charmhelpers.core.host import mkdir
 from charmhelpers.core.hookenv import (
     config,
     log,
@@ -14,10 +14,12 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     relation_get,
     DEBUG,
+    service_name
 )
 
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.openstack import templating, context
+from charmhelpers.contrib.openstack.alternatives import install_alternative
 
 from charmhelpers.contrib.openstack.utils import (
     configure_installation_source,
@@ -72,13 +74,10 @@ BASE_RESOURCE_MAP = {
 }
 
 CEPH_CONF = '/etc/ceph/ceph.conf'
+CHARM_CEPH_CONF = '/var/lib/charm/{}/ceph.conf'
 CEPH_SECRET = '/etc/ceph/secret.xml'
 
 CEPH_RESOURCES = {
-    CEPH_CONF: {
-        'contexts': [NovaComputeCephContext()],
-        'services': [],
-    },
     CEPH_SECRET: {
         'contexts': [NovaComputeCephContext()],
         'services': [],
@@ -114,6 +113,10 @@ VIRT_TYPES = {
 }
 
 
+def ceph_config_file():
+    return CHARM_CEPH_CONF.format(service_name())
+
+
 def resource_map():
     '''
     Dynamically generate a map of resources that will be managed for a single
@@ -122,6 +125,7 @@ def resource_map():
     # TODO: Cache this on first call?
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     net_manager = network_manager()
+    plugin = neutron_plugin()
 
     # Network manager gets set late by the cloud-compute interface.
     # FlatDHCPManager only requires some extra packages.
@@ -133,17 +137,15 @@ def resource_map():
 
     # Neutron/quantum requires additional contexts, as well as new resources
     # depending on the plugin used.
+    # NOTE(james-page): only required for ovs plugin right now
     if net_manager in ['neutron', 'quantum']:
-        if net_manager == 'quantum':
-            nm_rsc = QUANTUM_RESOURCES
-        if net_manager == 'neutron':
-            nm_rsc = NEUTRON_RESOURCES
-        resource_map.update(nm_rsc)
+        if plugin == 'ovs':
+            if net_manager == 'quantum':
+                nm_rsc = QUANTUM_RESOURCES
+            if net_manager == 'neutron':
+                nm_rsc = NEUTRON_RESOURCES
+            resource_map.update(nm_rsc)
 
-        resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
-
-        plugin = neutron_plugin()
-        if plugin:
             conf = neutron_plugin_attribute(plugin, 'config', net_manager)
             svcs = neutron_plugin_attribute(plugin, 'services', net_manager)
             ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
@@ -156,7 +158,25 @@ def resource_map():
             # associate the plugin agent with main network manager config(s)
             [resource_map[nmc]['services'].extend(svcs) for nmc in nm_rsc]
 
+        resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
+
     if relation_ids('ceph'):
+        # Add charm ceph configuration to resources and
+        # ensure directory actually exists
+        mkdir(os.path.dirname(ceph_config_file()))
+        mkdir(os.path.dirname(CEPH_CONF))
+        # Install ceph config as an alternative for co-location with
+        # ceph and ceph-osd charms - nova-compute ceph.conf will be
+        # lower priority that both of these but thats OK
+        if not os.path.exists(ceph_config_file()):
+            # touch file for pre-templated generation
+            open(ceph_config_file(), 'w').close()
+        install_alternative(os.path.basename(CEPH_CONF),
+                            CEPH_CONF, ceph_config_file())
+        CEPH_RESOURCES[ceph_config_file()] = {
+            'contexts': [NovaComputeCephContext()],
+            'services': [],
+        }
         resource_map.update(CEPH_RESOURCES)
 
     return resource_map
