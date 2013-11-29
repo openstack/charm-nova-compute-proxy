@@ -69,7 +69,12 @@ BASE_RESOURCE_MAP = {
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),
                      NovaComputeLibvirtContext(),
-                     NovaComputeCephContext()],
+                     NovaComputeCephContext(),
+                     context.SubordinateConfigContext(
+                         interface='nova-ceilometer',
+                         service='nova',
+                         config_file=NOVA_CONF,
+                     )],
     },
 }
 

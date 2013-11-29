@@ -209,6 +209,12 @@ def upgrade_charm():
         amqp_joined(relation_id=r_id)
 
 
+@hooks.hook('nova-ceilometer-relation-changed')
+@restart_on_change(restart_map())
+def nova_ceilometer_relation_changed():
+    CONFIGS.writeall()
+
+
 def main():
     try:
         hooks.execute(sys.argv)
