@@ -212,7 +212,7 @@ def upgrade_charm():
 @hooks.hook('nova-ceilometer-relation-changed')
 @restart_on_change(restart_map())
 def nova_ceilometer_relation_changed():
-    CONFIGS.writeall()
+    CONFIGS.write_all()
 
 
 def main():
