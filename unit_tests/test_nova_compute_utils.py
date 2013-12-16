@@ -247,3 +247,13 @@ class NovaComputeUtilsTests(CharmTestCase):
             call('/etc/nova/nova.conf', [ctxt1])
         ]
         self.assertEquals(fake_renderer.register.call_args_list, ex_reg)
+
+    @patch.object(utils, 'check_call')
+    def test_enable_shell(self, _check_call):
+        utils.enable_shell('dummy')
+        _check_call.assert_called_with(['usermod', '-s', '/bin/bash', 'dummy'])
+
+    @patch.object(utils, 'check_call')
+    def test_disable_shell(self, _check_call):
+        utils.disable_shell('dummy')
+        _check_call.assert_called_with(['usermod', '-s', '/bin/false', 'dummy'])

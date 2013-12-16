@@ -48,6 +48,8 @@ TO_PATCH = [
     'neutron_plugin',
     'public_ssh_key',
     'register_configs',
+    'disable_shell',
+    'enable_shell',
     # misc_utils
     'ensure_ceph_keyring',
     'execd_preinstall'
@@ -95,6 +97,36 @@ class NovaComputeRelationsTests(CharmTestCase):
             call('cloud-compute:1'),
         ]
         self.assertEquals(ex, compute_joined.call_args_list)
+
+    @patch.object(hooks, 'compute_joined')
+    def test_config_changed_with_resize(self, compute_joined):
+        self.test_config.set('enable-resize', True)
+        self.relation_ids.return_value = [
+            'cloud-compute:0',
+            'cloud-compute:1'
+        ]
+        hooks.config_changed()
+        ex = [
+            call('cloud-compute:0'),
+            call('cloud-compute:1'),
+        ]
+        self.assertEquals(ex, compute_joined.call_args_list)
+        self.assertTrue(self.enable_shell.called)
+
+    @patch.object(hooks, 'compute_joined')
+    def test_config_changed_without_resize(self, compute_joined):
+        self.test_config.set('enable-resize', False)
+        self.relation_ids.return_value = [
+            'cloud-compute:0',
+            'cloud-compute:1'
+        ]
+        hooks.config_changed()
+        ex = [
+            call('cloud-compute:0'),
+            call('cloud-compute:1'),
+        ]
+        self.assertEquals(ex, compute_joined.call_args_list)
+        self.assertTrue(self.disable_shell.called)
 
     @patch.object(hooks, 'compute_joined')
     def test_config_changed_no_upgrade_no_migration(self, compute_joined):
