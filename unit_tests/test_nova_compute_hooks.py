@@ -97,6 +97,7 @@ class NovaComputeRelationsTests(CharmTestCase):
             call('cloud-compute:1'),
         ]
         self.assertEquals(ex, compute_joined.call_args_list)
+        self.assertTrue(self.initialize_ssh_keys.called)
 
     @patch.object(hooks, 'compute_joined')
     def test_config_changed_with_resize(self, compute_joined):
@@ -111,6 +112,7 @@ class NovaComputeRelationsTests(CharmTestCase):
             call('cloud-compute:1'),
         ]
         self.assertEquals(ex, compute_joined.call_args_list)
+        self.initialize_ssh_keys.assert_called_with(user='nova')
         self.enable_shell.assert_called_with(user='nova')
 
     @patch.object(hooks, 'compute_joined')
