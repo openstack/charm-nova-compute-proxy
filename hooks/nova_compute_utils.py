@@ -399,3 +399,13 @@ def create_libvirt_secret(secret_file, secret_uuid, key):
     cmd = ['virsh', 'secret-set-value', '--secret', secret_uuid,
            '--base64', key]
     check_call(cmd)
+
+
+def enable_shell(user):
+    cmd = ['usermod', '-s', '/bin/bash', user]
+    check_call(cmd)
+
+
+def disable_shell(user):
+    cmd = ['usermod', '-s', '/bin/false', user]
+    check_call(cmd)

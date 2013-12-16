@@ -48,7 +48,8 @@ from nova_compute_utils import (
     register_configs,
     NOVA_CONF,
     QUANTUM_CONF, NEUTRON_CONF,
-    ceph_config_file, CEPH_SECRET
+    ceph_config_file, CEPH_SECRET,
+    enable_shell, disable_shell
 )
 
 from nova_compute_context import CEPH_SECRET_UUID
@@ -77,7 +78,10 @@ def config_changed():
         initialize_ssh_keys()
 
     if config('enable-resize') is True:
+        enable_shell(user='nova')
         initialize_ssh_keys(user='nova')
+    else:
+        disable_shell(user='nova')
 
     [compute_joined(rid) for rid in relation_ids('cloud-compute')]
 
