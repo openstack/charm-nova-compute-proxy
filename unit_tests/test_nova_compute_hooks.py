@@ -311,12 +311,11 @@ class NovaComputeRelationsTests(CharmTestCase):
 
     def test_compute_changed(self):
         hooks.compute_changed()
-        expected_funcs = [
-            self.import_authorized_keys,
-            self.import_keystone_ca_cert,
-        ]
-        for func in expected_funcs:
-            self.assertTrue(func.called)
+        self.assertTrue(self.import_keystone_ca_cert.called)
+        self.import_authorized_keys.assert_has_calls([
+            call(),
+            call(user='nova', prefix='nova'),
+        ])
 
     def test_ceph_joined(self):
         hooks.ceph_joined()
