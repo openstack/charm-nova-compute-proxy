@@ -50,6 +50,11 @@ options:
     default: "yes"
     type: string
     description: Whether to run nova-api and nova-network on the compute nodes.
+  enable-resize:
+    default: False
+    type: boolean
+    description: Enable instance resizing, which requires that passwordless SSH
+      access be setup between compute hosts.
   enable-live-migration:
     default: False
     type: boolean
