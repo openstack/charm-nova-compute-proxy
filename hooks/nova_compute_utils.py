@@ -336,25 +336,6 @@ def import_authorized_keys(user='root'):
         _hosts.write(b64decode(hosts))
 
 
-def configure_live_migration(configs=None):
-    """
-    Ensure libvirt live migration is properly configured or disabled,
-    depending on current config setting.
-    """
-    # dont think we need this
-    return
-    configs = configs or register_configs()
-    configs.write(LIBVIRTD_CONF)
-    configs.write(LIBVIRT_BIN)
-    configs.write(NOVA_CONF)
-
-    if not migration_enabled():
-        return
-
-    if config('migration-auth-type') == 'ssh':
-        initialize_ssh_keys()
-
-
 def do_openstack_upgrade(configs):
     new_src = config('openstack-origin')
     new_os_rel = get_os_codename_install_source(new_src)
