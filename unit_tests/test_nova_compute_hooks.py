@@ -48,6 +48,8 @@ TO_PATCH = [
     'neutron_plugin',
     'public_ssh_key',
     'register_configs',
+    'disable_shell',
+    'enable_shell',
     # misc_utils
     'ensure_ceph_keyring',
     'execd_preinstall'
@@ -95,6 +97,38 @@ class NovaComputeRelationsTests(CharmTestCase):
             call('cloud-compute:1'),
         ]
         self.assertEquals(ex, compute_joined.call_args_list)
+        self.assertTrue(self.initialize_ssh_keys.called)
+
+    @patch.object(hooks, 'compute_joined')
+    def test_config_changed_with_resize(self, compute_joined):
+        self.test_config.set('enable-resize', True)
+        self.relation_ids.return_value = [
+            'cloud-compute:0',
+            'cloud-compute:1'
+        ]
+        hooks.config_changed()
+        ex = [
+            call('cloud-compute:0'),
+            call('cloud-compute:1'),
+        ]
+        self.assertEquals(ex, compute_joined.call_args_list)
+        self.initialize_ssh_keys.assert_called_with(user='nova')
+        self.enable_shell.assert_called_with(user='nova')
+
+    @patch.object(hooks, 'compute_joined')
+    def test_config_changed_without_resize(self, compute_joined):
+        self.test_config.set('enable-resize', False)
+        self.relation_ids.return_value = [
+            'cloud-compute:0',
+            'cloud-compute:1'
+        ]
+        hooks.config_changed()
+        ex = [
+            call('cloud-compute:0'),
+            call('cloud-compute:1'),
+        ]
+        self.assertEquals(ex, compute_joined.call_args_list)
+        self.disable_shell.assert_called_with(user='nova')
 
     @patch.object(hooks, 'compute_joined')
     def test_config_changed_no_upgrade_no_migration(self, compute_joined):
@@ -239,7 +273,7 @@ class NovaComputeRelationsTests(CharmTestCase):
         hooks.image_service_changed()
         configs.write.assert_called_with('/etc/nova/nova.conf')
 
-    def test_compute_joined_no_migration(self):
+    def test_compute_joined_no_migration_no_resize(self):
         self.migration_enabled.return_value = False
         hooks.compute_joined()
         self.assertFalse(self.relation_set.called)
@@ -261,14 +295,27 @@ class NovaComputeRelationsTests(CharmTestCase):
             migration_auth_type='ssh'
         )
 
+    def test_compute_joined_with_resize(self):
+        self.test_config.set('enable-resize', True)
+        self.public_ssh_key.return_value = 'bar'
+        hooks.compute_joined()
+        self.relation_set.assert_called_with(
+            relation_id=None,
+            nova_ssh_public_key='bar'
+        )
+        hooks.compute_joined(rid='cloud-compute:2')
+        self.relation_set.assert_called_with(
+            relation_id='cloud-compute:2',
+            nova_ssh_public_key='bar'
+        )
+
     def test_compute_changed(self):
         hooks.compute_changed()
-        expected_funcs = [
-            self.import_authorized_keys,
-            self.import_keystone_ca_cert,
-        ]
-        for func in expected_funcs:
-            self.assertTrue(func.called)
+        self.assertTrue(self.import_keystone_ca_cert.called)
+        self.import_authorized_keys.assert_has_calls([
+            call(),
+            call(user='nova', prefix='nova'),
+        ])
 
     def test_ceph_joined(self):
         hooks.ceph_joined()

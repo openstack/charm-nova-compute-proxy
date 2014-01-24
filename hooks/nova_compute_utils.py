@@ -315,13 +315,18 @@ def initialize_ssh_keys(user='root'):
     check_output(['chown', '-R', user, ssh_dir])
 
 
-def import_authorized_keys(user='root'):
+def import_authorized_keys(user='root', prefix=None):
     """Import SSH authorized_keys + known_hosts from a cloud-compute relation
     and store in user's $HOME/.ssh.
     """
-    # XXX: Should this be managed via templates + contexts?
-    hosts = relation_get('known_hosts')
-    auth_keys = relation_get('authorized_keys')
+    if prefix:
+        hosts = relation_get('{}_known_hosts'.format(prefix))
+        auth_keys = relation_get('{}_authorized_keys'.format(prefix))
+    else:
+        # XXX: Should this be managed via templates + contexts?
+        hosts = relation_get('known_hosts')
+        auth_keys = relation_get('authorized_keys')
+
     # XXX: Need to fix charm-helpers to return None for empty settings,
     #      in all cases.
     if not hosts or not auth_keys:
@@ -379,4 +384,14 @@ def create_libvirt_secret(secret_file, secret_uuid, key):
     check_call(cmd)
     cmd = ['virsh', 'secret-set-value', '--secret', secret_uuid,
            '--base64', key]
+    check_call(cmd)
+
+
+def enable_shell(user):
+    cmd = ['usermod', '-s', '/bin/bash', user]
+    check_call(cmd)
+
+
+def disable_shell(user):
+    cmd = ['usermod', '-s', '/bin/false', user]
     check_call(cmd)

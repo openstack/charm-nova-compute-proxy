@@ -179,7 +179,7 @@ class NovaComputeUtilsTests(CharmTestCase):
             self.assertFalse(_open.called)
 
     @patch('pwd.getpwnam')
-    def test_import_authorized_keys(self, getpwnam):
+    def _test_import_authorized_keys_base(self, getpwnam, prefix=None):
         getpwnam.return_value = self.fake_user('foo')
         self.relation_get.side_effect = [
             'Zm9vX2tleQo=',  # relation_get('known_hosts')
@@ -199,6 +199,38 @@ class NovaComputeUtilsTests(CharmTestCase):
             utils.import_authorized_keys(user='foo')
             self.assertEquals(ex_open, _open.call_args_list)
             self.assertEquals(ex_write, _file.write.call_args_list)
+
+        self.relation_get.assert_has_called([
+            call('known_hosts').
+            call('authorized_keys')
+        ])
+
+    @patch('pwd.getpwnam')
+    def test_import_authorized_keys_prefix(self, getpwnam):
+        getpwnam.return_value = self.fake_user('foo')
+        self.relation_get.side_effect = [
+            'Zm9vX2tleQo=',  # relation_get('known_hosts')
+            'Zm9vX2hvc3QK',  # relation_get('authorized_keys')
+        ]
+
+        ex_open = [
+            call('/home/foo/.ssh/authorized_keys', 'wb'),
+            call('/home/foo/.ssh/known_hosts', 'wb')
+        ]
+        ex_write = [
+            call('foo_host\n'),
+            call('foo_key\n'),
+        ]
+
+        with patch_open() as (_open, _file):
+            utils.import_authorized_keys(user='foo', prefix='bar')
+            self.assertEquals(ex_open, _open.call_args_list)
+            self.assertEquals(ex_write, _file.write.call_args_list)
+
+        self.relation_get.assert_has_called([
+            call('bar_known_hosts').
+            call('bar_authorized_keys')
+        ])
 
     @patch('subprocess.check_call')
     def test_import_keystone_cert_missing_data(self, check_call):
@@ -247,3 +279,14 @@ class NovaComputeUtilsTests(CharmTestCase):
             call('/etc/nova/nova.conf', [ctxt1])
         ]
         self.assertEquals(fake_renderer.register.call_args_list, ex_reg)
+
+    @patch.object(utils, 'check_call')
+    def test_enable_shell(self, _check_call):
+        utils.enable_shell('dummy')
+        _check_call.assert_called_with(['usermod', '-s', '/bin/bash', 'dummy'])
+
+    @patch.object(utils, 'check_call')
+    def test_disable_shell(self, _check_call):
+        utils.disable_shell('dummy')
+        _check_call.assert_called_with(['usermod', '-s', '/bin/false',
+                                        'dummy'])
