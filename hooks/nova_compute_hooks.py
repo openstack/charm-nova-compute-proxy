@@ -109,6 +109,20 @@ def amqp_changed():
         CONFIGS.write(NEUTRON_CONF)
 
 
+@hooks.hook('amqp-relation-departed')
+@restart_on_change(restart_map())
+def amqp_departed():
+    if 'amqp' not in CONFIGS.complete_contexts():
+        log('amqp relation incomplete. Peer not ready?')
+        return
+    CONFIGS.write(NOVA_CONF)
+
+    if network_manager() == 'quantum' and neutron_plugin() == 'ovs':
+        CONFIGS.write(QUANTUM_CONF)
+    if network_manager() == 'neutron' and neutron_plugin() == 'ovs':
+        CONFIGS.write(NEUTRON_CONF)
+
+
 @hooks.hook('shared-db-relation-joined')
 def db_joined(rid=None):
     relation_set(relation_id=rid,
