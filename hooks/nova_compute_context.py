@@ -99,6 +99,7 @@ class NovaComputeLibvirtContext(context.OSContextGenerator):
             # nova.conf
             ctxt['live_migration_uri'] = 'qemu+ssh://%s/system'
 
+        ctxt['use_syslog'] = config('use-syslog')
         return ctxt
 
 

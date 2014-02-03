@@ -170,10 +170,10 @@ class NovaComputeContextTests(CharmTestCase):
     def test_libvirt_bin_context_no_migration(self):
         self.test_config.set('enable-live-migration', False)
         libvirt = context.NovaComputeLibvirtContext()
-        self.assertEquals({'libvirtd_opts': '-d', 'listen_tls': 0}, libvirt())
+        self.assertEquals({'libvirtd_opts': '-d', 'listen_tls': 0, 'use_syslog': False}, libvirt())
 
     def test_libvirt_bin_context_migration_tcp_listen(self):
         self.test_config.set('enable-live-migration', True)
         libvirt = context.NovaComputeLibvirtContext()
         self.assertEquals(
-            {'libvirtd_opts': '-d -l', 'listen_tls': 0}, libvirt())
+            {'libvirtd_opts': '-d -l', 'listen_tls': 0, 'use_syslog': False}, libvirt())
