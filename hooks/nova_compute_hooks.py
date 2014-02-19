@@ -83,6 +83,10 @@ def config_changed():
     else:
         disable_shell(user='nova')
 
+    if config('instances-path') != '':
+        fp = config('instances-path')
+        fix_path_ownership(user='nova', fp)
+
     [compute_joined(rid) for rid in relation_ids('cloud-compute')]
 
     CONFIGS.write_all()

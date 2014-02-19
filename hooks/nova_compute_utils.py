@@ -395,3 +395,8 @@ def enable_shell(user):
 def disable_shell(user):
     cmd = ['usermod', '-s', '/bin/false', user]
     check_call(cmd)
+
+
+def fix_path_ownership(user='nova', path):
+    cmd = ['chown', user, path]
+    check_call(cmd)
