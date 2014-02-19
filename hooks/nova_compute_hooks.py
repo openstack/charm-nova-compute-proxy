@@ -85,7 +85,7 @@ def config_changed():
 
     if config('instances-path') != '':
         fp = config('instances-path')
-        fix_path_ownership(user='nova', fp)
+        fix_path_ownership(fp, user='nova')
 
     [compute_joined(rid) for rid in relation_ids('cloud-compute')]
 
