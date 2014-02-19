@@ -49,7 +49,8 @@ from nova_compute_utils import (
     NOVA_CONF,
     QUANTUM_CONF, NEUTRON_CONF,
     ceph_config_file, CEPH_SECRET,
-    enable_shell, disable_shell
+    enable_shell, disable_shell,
+    fix_path_ownership
 )
 
 from nova_compute_context import CEPH_SECRET_UUID
