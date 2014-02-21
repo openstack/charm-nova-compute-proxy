@@ -43,10 +43,11 @@ BASE_PACKAGES = [
     'genisoimage',  # was missing as a package dependency until raring.
 ]
 
+NOVA_CONF_DIR = "/etc/nova"
 QEMU_CONF = '/etc/libvirt/qemu.conf'
 LIBVIRTD_CONF = '/etc/libvirt/libvirtd.conf'
 LIBVIRT_BIN = '/etc/default/libvirt-bin'
-NOVA_CONF = '/etc/nova/nova.conf'
+NOVA_CONF = '%s/nova.conf' % NOVA_CONF_DIR
 
 BASE_RESOURCE_MAP = {
     QEMU_CONF: {
@@ -64,7 +65,8 @@ BASE_RESOURCE_MAP = {
     NOVA_CONF: {
         'services': ['nova-compute'],
         'contexts': [context.AMQPContext(),
-                     context.SharedDBContext(relation_prefix='nova'),
+                     context.SharedDBContext(
+                         relation_prefix='nova', ssl_dir=NOVA_CONF_DIR),
                      context.ImageServiceContext(),
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),
