@@ -91,21 +91,25 @@ CEPH_RESOURCES = {
     }
 }
 
-QUANTUM_CONF = '/etc/quantum/quantum.conf'
+QUANTUM_CONF_DIR = "/etc/quantum"
+QUANTUM_CONF = '%s/quantum.conf' % QUANTUM_CONF_DIR
 
 QUANTUM_RESOURCES = {
     QUANTUM_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(), NeutronComputeContext()],
+        'contexts': [context.AMQPContext(ssl_dir=QUANTUM_CONF_DIR),
+                     NeutronComputeContext()],
     }
 }
 
-NEUTRON_CONF = '/etc/neutron/neutron.conf'
+NEUTRON_CONF_DIR = "/etc/neutron"
+NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(), NeutronComputeContext()],
+        'contexts': [context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR),
+                     NeutronComputeContext()],
     }
 }
 
