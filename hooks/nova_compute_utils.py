@@ -64,7 +64,7 @@ BASE_RESOURCE_MAP = {
     },
     NOVA_CONF: {
         'services': ['nova-compute'],
-        'contexts': [context.AMQPContext(),
+        'contexts': [context.AMQPContext(ssl_dir=NOVA_CONF_DIR),
                      context.SharedDBContext(
                          relation_prefix='nova', ssl_dir=NOVA_CONF_DIR),
                      context.ImageServiceContext(),
