@@ -6,7 +6,7 @@ description: |
  addition to its "native" API (the OpenStack API), it also supports the Amazon
  EC2 API.
 categories:
-    - openstack
+  - openstack
 provides:
   cloud-compute:
     interface: nova-compute
@@ -21,6 +21,9 @@ requires:
     interface: ceph-client
   nrpe-external-master:
     interface: nrpe-external-master
+    scope: container
+  nova-ceilometer:
+    interface: nova-ceilometer
     scope: container
 peers:
   compute-peer:

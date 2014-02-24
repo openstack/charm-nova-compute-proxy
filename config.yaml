@@ -26,6 +26,12 @@ options:
     default: openstack
     type: string
     decsription: Rabbitmq vhost
+  use-syslog:
+    type: boolean
+    default: False
+    description: |
+      By default, all services will log into their corresponding log files.
+      Setting this to True will force all services to log to the syslog.
   database-user:
     default: nova
     type: string
@@ -50,6 +56,11 @@ options:
     default: "yes"
     type: string
     description: Whether to run nova-api and nova-network on the compute nodes.
+  enable-resize:
+    default: False
+    type: boolean
+    description: Enable instance resizing, which requires that passwordless SSH
+      access be setup between compute hosts.
   enable-live-migration:
     default: False
     type: boolean

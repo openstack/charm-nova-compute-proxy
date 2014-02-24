@@ -48,7 +48,8 @@ from nova_compute_utils import (
     register_configs,
     NOVA_CONF,
     QUANTUM_CONF, NEUTRON_CONF,
-    ceph_config_file, CEPH_SECRET
+    ceph_config_file, CEPH_SECRET,
+    enable_shell, disable_shell
 )
 
 from nova_compute_context import CEPH_SECRET_UUID
@@ -75,7 +76,14 @@ def config_changed():
         # Check-in with nova-c-c and register new ssh key, if it has just been
         # generated.
         initialize_ssh_keys()
-        [compute_joined(rid) for rid in relation_ids('cloud-compute')]
+
+    if config('enable-resize') is True:
+        enable_shell(user='nova')
+        initialize_ssh_keys(user='nova')
+    else:
+        disable_shell(user='nova')
+
+    [compute_joined(rid) for rid in relation_ids('cloud-compute')]
 
     CONFIGS.write_all()
 
@@ -140,15 +148,19 @@ def image_service_changed():
 
 @hooks.hook('cloud-compute-relation-joined')
 def compute_joined(rid=None):
-    if not migration_enabled():
-        return
-    auth_type = config('migration-auth-type')
-    settings = {
-        'migration_auth_type': auth_type
-    }
-    if auth_type == 'ssh':
-        settings['ssh_public_key'] = public_ssh_key()
-    relation_set(relation_id=rid, **settings)
+    if migration_enabled():
+        auth_type = config('migration-auth-type')
+        settings = {
+            'migration_auth_type': auth_type
+        }
+        if auth_type == 'ssh':
+            settings['ssh_public_key'] = public_ssh_key()
+        relation_set(relation_id=rid, **settings)
+    if config('enable-resize'):
+        settings = {
+            'nova_ssh_public_key': public_ssh_key(user='nova')
+        }
+        relation_set(relation_id=rid, **settings)
 
 
 @hooks.hook('cloud-compute-relation-changed')
@@ -158,6 +170,7 @@ def compute_changed():
     # config advertised from controller.
     CONFIGS.write_all()
     import_authorized_keys()
+    import_authorized_keys(user='nova', prefix='nova')
     import_keystone_ca_cert()
     if (network_manager() in ['quantum', 'neutron']
             and neutron_plugin() == 'ovs'):
@@ -207,6 +220,12 @@ def relation_broken():
 def upgrade_charm():
     for r_id in relation_ids('amqp'):
         amqp_joined(relation_id=r_id)
+
+
+@hooks.hook('nova-ceilometer-relation-changed')
+@restart_on_change(restart_map())
+def nova_ceilometer_relation_changed():
+    CONFIGS.write_all()
 
 
 def main():
