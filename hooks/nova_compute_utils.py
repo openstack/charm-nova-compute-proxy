@@ -97,8 +97,8 @@ QUANTUM_CONF = '%s/quantum.conf' % QUANTUM_CONF_DIR
 QUANTUM_RESOURCES = {
     QUANTUM_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(ssl_dir=QUANTUM_CONF_DIR),
-                     NeutronComputeContext()],
+        'contexts': [NeutronComputeContext(),
+                     context.AMQPContext(ssl_dir=QUANTUM_CONF_DIR)]
     }
 }
 
@@ -108,8 +108,8 @@ NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR),
-                     NeutronComputeContext()],
+        'contexts': [NeutronComputeContext(),
+                     context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR)],
     }
 }
 
