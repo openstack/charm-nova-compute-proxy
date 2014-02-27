@@ -220,8 +220,9 @@ class CloudComputeContext(context.OSContextGenerator):
 
         neutron_ctxt['neutron_security_groups'] = _neutron_security_groups()
 
-        ks_url = 'http://%s:%s/v2.0' % (neutron_ctxt['keystone_host'],
-                                        neutron_ctxt['auth_port'])
+        ks_url = '%s://%s:%s/v2.0' % (neutron_ctxt['auth_protocol'] or 'http',
+                                      neutron_ctxt['keystone_host'],
+                                      neutron_ctxt['auth_port'])
         neutron_ctxt['neutron_admin_auth_url'] = ks_url
 
         if self.network_manager == 'quantum':
