@@ -84,7 +84,7 @@ def config_changed():
     else:
         disable_shell(user='nova')
 
-    if config('instances-path') != '':
+    if config('instances-path') is None:
         fp = config('instances-path')
         fix_path_ownership(fp, user='nova')
 

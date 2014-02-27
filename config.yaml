@@ -84,7 +84,6 @@ options:
     type: string
     description: Network interface on which to build bridge
   instances-path:
-    default: ''
     type: string
     description: Instance path to use - empty means default of /var/lib/nova/instances
   config-flags:
