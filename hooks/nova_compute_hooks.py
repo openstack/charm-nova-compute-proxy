@@ -96,6 +96,7 @@ def amqp_joined(relation_id=None):
 
 
 @hooks.hook('amqp-relation-changed')
+@hooks.hook('amqp-relation-departed')
 @restart_on_change(restart_map())
 def amqp_changed():
     if 'amqp' not in CONFIGS.complete_contexts():
