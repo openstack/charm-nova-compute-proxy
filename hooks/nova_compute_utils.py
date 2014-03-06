@@ -6,7 +6,7 @@ from copy import deepcopy
 from subprocess import check_call, check_output
 
 from charmhelpers.fetch import apt_update, apt_upgrade
-from charmhelpers.core.host import mkdir
+from charmhelpers.core.host import mkdir, service_restart
 from charmhelpers.core.hookenv import (
     config,
     log,
@@ -200,6 +200,14 @@ def restart_map():
     return {k: v['services'] for k, v in resource_map().iteritems()}
 
 
+def services():
+    ''' Returns a list of services associate with this charm '''
+    _services = []
+    for v in restart_map().values():
+        _services = _services + v
+    return list(set(_services))
+
+
 def register_configs():
     '''
     Returns an OSTemplateRenderer object with all required configs registered.
@@ -363,7 +371,9 @@ def do_openstack_upgrade(configs):
 
     # set CONFIGS to load templates from new release and regenerate config
     configs.set_release(openstack_release=new_os_rel)
-    configs.write_all()
+    new_configs = register_configs()
+    new_configs.write_all()
+    [service_restart(s) for s in services()]
 
 
 def import_keystone_ca_cert():
