@@ -5,7 +5,7 @@ from base64 import b64decode
 from copy import deepcopy
 from subprocess import check_call, check_output
 
-from charmhelpers.fetch import apt_update, apt_install
+from charmhelpers.fetch import apt_update, apt_upgrade
 from charmhelpers.core.host import mkdir
 from charmhelpers.core.hookenv import (
     config,
@@ -359,7 +359,7 @@ def do_openstack_upgrade(configs):
         '--option', 'Dpkg::Options::=--force-confdef',
     ]
 
-    apt_install(packages=determine_packages(), options=dpkg_opts, fatal=True)
+    apt_upgrade(options=dpkg_opts, fatal=True)
 
     # set CONFIGS to load templates from new release and regenerate config
     configs.set_release(openstack_release=new_os_rel)
