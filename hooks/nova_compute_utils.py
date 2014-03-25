@@ -230,8 +230,9 @@ def determine_packages():
         packages.extend(['nova-api', 'nova-network'])
     elif net_manager == 'quantum':
         plugin = neutron_plugin()
-        packages.extend(
-            neutron_plugin_attribute(plugin, 'packages', net_manager))
+        pkg_lists = neutron_plugin_attribute(plugin, 'packages', net_manager)
+        for pkg_list in pkg_lists:
+            packages.extend(pkg_list)
 
     if relation_ids('ceph'):
         packages.append('ceph-common')
