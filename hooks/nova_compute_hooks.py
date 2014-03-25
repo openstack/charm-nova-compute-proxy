@@ -134,8 +134,8 @@ def db_joined(rid=None):
                      neutron_hostname=unit_get('private-address'))
 
 
-@hooks.hook('pgsql-nova-db-relation-joined')
-def pgsql_nova_db_joined():
+@hooks.hook('pgsql-db-relation-joined')
+def pgsql_db_joined():
     if is_relation_made('shared-db'):
         # raise error
         e = ('Attempting to associate a postgresql database when there is already '
@@ -147,11 +147,23 @@ def pgsql_nova_db_joined():
 
 
 @hooks.hook('shared-db-relation-changed')
-@hooks.hook('pgsql-db-relation-changed')
 @restart_on_change(restart_map())
 def db_changed():
     if 'shared-db' not in CONFIGS.complete_contexts():
         log('shared-db relation incomplete. Peer not ready?')
+        return
+    CONFIGS.write(NOVA_CONF)
+    nm = network_manager()
+    plugin = neutron_plugin()
+    if nm in ['quantum', 'neutron'] and plugin == 'ovs':
+        CONFIGS.write(neutron_plugin_attribute(plugin, 'config', nm))
+
+
+@hooks.hook('pgsql-db-relation-changed')
+@restart_on_change(restart_map())
+def postgresql_db_changed():
+    if 'pgsql-db' not in CONFIGS.complete_contexts():
+        log('pgsql-db relation incomplete. Peer not ready?')
         return
     CONFIGS.write(NOVA_CONF)
     nm = network_manager()
