@@ -117,7 +117,7 @@ def db_joined(rid=None):
     if is_relation_made('pgsql-db'):
         # error, postgresql is used
         e = ('Attempting to associate a mysql database when there is already '
-                'associated a postgresql one')
+             'associated a postgresql one')
         log(e, level=ERROR)
         raise Exception(e)
 
