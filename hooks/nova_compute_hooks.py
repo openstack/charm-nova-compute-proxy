@@ -5,7 +5,9 @@ import sys
 from charmhelpers.core.hookenv import (
     Hooks,
     config,
+    is_relation_made,
     log,
+    ERROR,
     relation_ids,
     relation_get,
     relation_set,
@@ -112,6 +114,13 @@ def amqp_changed():
 
 @hooks.hook('shared-db-relation-joined')
 def db_joined(rid=None):
+    if is_relation_made('pgsql-db'):
+        # error, postgresql is used
+        e = ('Attempting to associate a mysql database when there is already '
+                'associated a postgresql one')
+        log(e, level=ERROR)
+        raise Exception(e)
+
     relation_set(relation_id=rid,
                  nova_database=config('database'),
                  nova_username=config('database-user'),
@@ -125,7 +134,20 @@ def db_joined(rid=None):
                      neutron_hostname=unit_get('private-address'))
 
 
+@hooks.hook('pgsql-nova-db-relation-joined')
+def pgsql_nova_db_joined():
+    if is_relation_made('shared-db'):
+        # raise error
+        e = ('Attempting to associate a postgresql database when there is already '
+             'associated a mysql one')
+        log(e, level=ERROR)
+        raise Exception(e)
+
+    relation_set(database=config('database'))
+
+
 @hooks.hook('shared-db-relation-changed')
+@hooks.hook('pgsql-db-relation-changed')
 @restart_on_change(restart_map())
 def db_changed():
     if 'shared-db' not in CONFIGS.complete_contexts():
@@ -211,7 +233,8 @@ def ceph_changed():
 @hooks.hook('amqp-relation-broken',
             'ceph-relation-broken',
             'image-service-relation-broken',
-            'shared-db-relation-broken')
+            'shared-db-relation-broken',
+            'pgsql-db-relation-broken')
 @restart_on_change(restart_map())
 def relation_broken():
     CONFIGS.write_all()

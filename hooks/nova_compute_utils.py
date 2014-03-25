@@ -65,6 +65,7 @@ BASE_RESOURCE_MAP = {
         'services': ['nova-compute'],
         'contexts': [context.AMQPContext(),
                      context.SharedDBContext(relation_prefix='nova'),
+                     context.PostgresqlDBContext(),
                      context.ImageServiceContext(),
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),
