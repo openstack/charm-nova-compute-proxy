@@ -228,7 +228,7 @@ def determine_packages():
     if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
             config('multi-host').lower() == 'yes'):
         packages.extend(['nova-api', 'nova-network'])
-    elif net_manager == 'quantum':
+    elif net_manager in ['quantum', 'neutron']:
         plugin = neutron_plugin()
         pkg_lists = neutron_plugin_attribute(plugin, 'packages', net_manager)
         for pkg_list in pkg_lists:
