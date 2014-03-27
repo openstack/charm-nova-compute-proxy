@@ -20,6 +20,7 @@ TO_PATCH = [
     'Hooks',
     'config',
     'log',
+    'is_relation_made',
     'relation_get',
     'relation_ids',
     'relation_set',
@@ -177,6 +178,7 @@ class NovaComputeRelationsTests(CharmTestCase):
 
     def test_db_joined(self):
         self.unit_get.return_value = 'nova.foohost.com'
+        self.is_relation_made.return_value = False
         hooks.db_joined()
         self.relation_set.assert_called_with(relation_id=None,
                                              nova_database='nova',
@@ -186,6 +188,7 @@ class NovaComputeRelationsTests(CharmTestCase):
 
     def test_db_joined_quantum_ovs(self):
         self.unit_get.return_value = 'nova.foohost.com'
+        self.is_relation_made.return_value = False
         self.network_manager.return_value = 'quantum'
         self.neutron_plugin.return_value = 'ovs'
         hooks.db_joined(rid='shared-db:0')
@@ -203,6 +206,7 @@ class NovaComputeRelationsTests(CharmTestCase):
 
     def test_db_joined_quantum_nvp(self):
         self.unit_get.return_value = 'nova.foohost.com'
+        self.is_relation_made.return_value = False
         self.network_manager.return_value = 'quantum'
         self.neutron_plugin.return_value = 'nvp'
         hooks.db_joined(rid='shared-db:0')
