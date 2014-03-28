@@ -198,8 +198,8 @@ class NovaComputeRelationsTests(CharmTestCase):
         with self.assertRaises(Exception) as context:
             hooks.db_joined()
         self.assertEqual(context.exception.message,
-            'Attempting to associate a mysql database when there '
-            'is already associated a postgresql one')
+                         'Attempting to associate a mysql database when there '
+                         'is already associated a postgresql one')
 
     def test_postgresql_joined_with_db(self):
         self.is_relation_made.return_value = True
@@ -207,8 +207,8 @@ class NovaComputeRelationsTests(CharmTestCase):
         with self.assertRaises(Exception) as context:
             hooks.pgsql_db_joined()
         self.assertEqual(context.exception.message,
-            'Attempting to associate a postgresql database when there '
-            'is already associated a mysql one')
+                         'Attempting to associate a postgresql database when there '
+                         'is already associated a mysql one')
 
     def test_db_joined_quantum_ovs(self):
         self.unit_get.return_value = 'nova.foohost.com'

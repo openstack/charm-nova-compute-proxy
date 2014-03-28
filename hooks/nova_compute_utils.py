@@ -43,10 +43,11 @@ BASE_PACKAGES = [
     'genisoimage',  # was missing as a package dependency until raring.
 ]
 
+NOVA_CONF_DIR = "/etc/nova"
 QEMU_CONF = '/etc/libvirt/qemu.conf'
 LIBVIRTD_CONF = '/etc/libvirt/libvirtd.conf'
 LIBVIRT_BIN = '/etc/default/libvirt-bin'
-NOVA_CONF = '/etc/nova/nova.conf'
+NOVA_CONF = '%s/nova.conf' % NOVA_CONF_DIR
 
 BASE_RESOURCE_MAP = {
     QEMU_CONF: {
@@ -64,7 +65,8 @@ BASE_RESOURCE_MAP = {
     NOVA_CONF: {
         'services': ['nova-compute'],
         'contexts': [context.AMQPContext(),
-                     context.SharedDBContext(relation_prefix='nova'),
+                     context.SharedDBContext(
+                         relation_prefix='nova', ssl_dir=NOVA_CONF_DIR),
                      context.PostgresqlDBContext(),
                      context.ImageServiceContext(),
                      context.OSConfigFlagContext(),
@@ -91,24 +93,26 @@ CEPH_RESOURCES = {
     }
 }
 
-QUANTUM_CONF = '/etc/quantum/quantum.conf'
+QUANTUM_CONF_DIR = "/etc/quantum"
+QUANTUM_CONF = '%s/quantum.conf' % QUANTUM_CONF_DIR
 
 QUANTUM_RESOURCES = {
     QUANTUM_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(),
-                     NeutronComputeContext(),
+        'contexts': [NeutronComputeContext(),
+                     context.AMQPContext(ssl_dir=QUANTUM_CONF_DIR),
                      context.SyslogContext()],
     }
 }
 
-NEUTRON_CONF = '/etc/neutron/neutron.conf'
+NEUTRON_CONF_DIR = "/etc/neutron"
+NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(),
-                     NeutronComputeContext(),
+        'contexts': [NeutronComputeContext(),
+                     context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR),
                      context.SyslogContext()],
     }
 }
@@ -229,10 +233,11 @@ def determine_packages():
     if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
             config('multi-host').lower() == 'yes'):
         packages.extend(['nova-api', 'nova-network'])
-    elif net_manager == 'quantum':
+    elif net_manager in ['quantum', 'neutron']:
         plugin = neutron_plugin()
-        packages.extend(
-            neutron_plugin_attribute(plugin, 'packages', net_manager))
+        pkg_lists = neutron_plugin_attribute(plugin, 'packages', net_manager)
+        for pkg_list in pkg_lists:
+            packages.extend(pkg_list)
 
     if relation_ids('ceph'):
         packages.append('ceph-common')

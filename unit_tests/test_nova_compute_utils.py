@@ -4,6 +4,7 @@ from test_utils import CharmTestCase, patch_open
 
 
 import nova_compute_utils as utils
+import itertools
 
 TO_PATCH = [
     'config',
@@ -19,9 +20,11 @@ TO_PATCH = [
 ]
 
 OVS_PKGS = [
-    'quantum-plugin-openvswitch-agent',
-    'openvswitch-datapath-dkms',
+    ['quantum-plugin-openvswitch-agent'],
+    ['openvswitch-datapath-dkms'],
 ]
+
+OVS_PKGS_FLAT = list(itertools.chain.from_iterable(OVS_PKGS))
 
 
 class NovaComputeUtilsTests(CharmTestCase):
@@ -51,7 +54,7 @@ class NovaComputeUtilsTests(CharmTestCase):
         n_plugin.return_value = 'ovs'
         self.relation_ids.return_value = []
         result = utils.determine_packages()
-        ex = utils.BASE_PACKAGES + OVS_PKGS + ['nova-compute-kvm']
+        ex = utils.BASE_PACKAGES + OVS_PKGS_FLAT + ['nova-compute-kvm']
         self.assertEquals(ex, result)
 
     @patch.object(utils, 'neutron_plugin')
@@ -62,7 +65,7 @@ class NovaComputeUtilsTests(CharmTestCase):
         n_plugin.return_value = 'ovs'
         self.relation_ids.return_value = ['ceph:0']
         result = utils.determine_packages()
-        ex = (utils.BASE_PACKAGES + OVS_PKGS +
+        ex = (utils.BASE_PACKAGES + OVS_PKGS_FLAT +
               ['ceph-common', 'nova-compute-kvm'])
         self.assertEquals(ex, result)
 

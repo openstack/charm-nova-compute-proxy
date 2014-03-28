@@ -22,6 +22,7 @@ QUANTUM_CONTEXT = {
     'quantum_auth_strategy': 'keystone',
     'keystone_host': 'keystone_host',
     'auth_port': '5000',
+    'auth_protocol': 'https',
     'quantum_url': 'http://quantum_url',
     'service_tenant_name': 'admin',
     'service_username': 'admin',
@@ -143,9 +144,11 @@ class NovaComputeContextTests(CharmTestCase):
         ex_ctxt = {
             'network_manager': 'quantum',
             'network_manager_config': {
+                'auth_protocol': 'https',
+                'service_protocol': 'http',
                 'auth_port': '5000',
                 'keystone_host': 'keystone_host',
-                'quantum_admin_auth_url': 'http://keystone_host:5000/v2.0',
+                'quantum_admin_auth_url': 'https://keystone_host:5000/v2.0',
                 'quantum_admin_password': 'openstack',
                 'quantum_admin_tenant_name': 'admin',
                 'quantum_admin_username': 'admin',
