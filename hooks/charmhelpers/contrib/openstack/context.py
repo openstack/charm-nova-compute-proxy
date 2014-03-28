@@ -178,7 +178,6 @@ class PostgresqlDBContext(OSContextGenerator):
                     'database_user': relation_get('user', rid=rid, unit=unit),
                     'database_password': relation_get('password', rid=rid, unit=unit),
                     'database_type': 'postgresql',
-                    'database_password': rdata.get(password_setting)
                 }
                 if context_complete(ctxt):
                     db_ssl(rdata, ctxt, self.ssl_dir)
