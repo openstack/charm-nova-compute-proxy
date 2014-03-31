@@ -70,6 +70,7 @@ BASE_RESOURCE_MAP = {
                      CloudComputeContext(),
                      NovaComputeLibvirtContext(),
                      NovaComputeCephContext(),
+                     context.SyslogContext(),
                      context.SubordinateConfigContext(
                          interface='nova-ceilometer',
                          service='nova',
@@ -94,7 +95,9 @@ QUANTUM_CONF = '/etc/quantum/quantum.conf'
 QUANTUM_RESOURCES = {
     QUANTUM_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(), NeutronComputeContext()],
+        'contexts': [context.AMQPContext(),
+                     NeutronComputeContext(),
+                     context.SyslogContext()],
     }
 }
 
@@ -103,7 +106,9 @@ NEUTRON_CONF = '/etc/neutron/neutron.conf'
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(), NeutronComputeContext()],
+        'contexts': [context.AMQPContext(),
+                     NeutronComputeContext(),
+                     context.SyslogContext()],
     }
 }
 
