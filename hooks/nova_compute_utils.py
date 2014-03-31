@@ -67,6 +67,7 @@ BASE_RESOURCE_MAP = {
         'contexts': [context.AMQPContext(ssl_dir=NOVA_CONF_DIR),
                      context.SharedDBContext(
                          relation_prefix='nova', ssl_dir=NOVA_CONF_DIR),
+                     context.PostgresqlDBContext(),
                      context.ImageServiceContext(),
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),

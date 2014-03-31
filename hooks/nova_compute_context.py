@@ -73,6 +73,7 @@ def _neutron_url(rid, unit):
 
 
 class NovaComputeLibvirtContext(context.OSContextGenerator):
+
     '''
     Determines various libvirt and nova options depending on live migration
     configuration.
@@ -110,6 +111,7 @@ class NovaComputeVirtContext(context.OSContextGenerator):
 
 
 class NovaComputeCephContext(context.CephContext):
+
     def __call__(self):
         ctxt = super(NovaComputeCephContext, self).__call__()
         if not ctxt:
@@ -127,6 +129,7 @@ class NovaComputeCephContext(context.CephContext):
 
 
 class CloudComputeContext(context.OSContextGenerator):
+
     '''
     Generates main context for writing nova.conf and quantum.conf templates
     from a cloud-compute relation changed hook.  Mainly used for determinig

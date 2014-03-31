@@ -20,6 +20,7 @@ TO_PATCH = [
     'Hooks',
     'config',
     'log',
+    'is_relation_made',
     'relation_get',
     'relation_ids',
     'relation_set',
@@ -177,6 +178,7 @@ class NovaComputeRelationsTests(CharmTestCase):
 
     def test_db_joined(self):
         self.unit_get.return_value = 'nova.foohost.com'
+        self.is_relation_made.return_value = False
         hooks.db_joined()
         self.relation_set.assert_called_with(relation_id=None,
                                              nova_database='nova',
@@ -184,37 +186,29 @@ class NovaComputeRelationsTests(CharmTestCase):
                                              nova_hostname='nova.foohost.com')
         self.unit_get.assert_called_with('private-address')
 
-    def test_db_joined_quantum_ovs(self):
+    def test_postgresql_db_joined(self):
         self.unit_get.return_value = 'nova.foohost.com'
-        self.network_manager.return_value = 'quantum'
-        self.neutron_plugin.return_value = 'ovs'
-        hooks.db_joined(rid='shared-db:0')
-        calls = [call(nova_database='nova',
-                      nova_username='nova',
-                      nova_hostname='nova.foohost.com',
-                      relation_id='shared-db:0'),
-                 call(neutron_database='neutron',
-                      neutron_username='neutron',
-                      neutron_hostname='nova.foohost.com',
-                      relation_id='shared-db:0')]
-        [self.assertIn(c, self.relation_set.call_args_list)
-         for c in calls]
-        self.unit_get.assert_called_with('private-address')
+        self.is_relation_made.return_value = False
+        hooks.pgsql_db_joined()
+        self.relation_set.assert_called_with(database='nova'),
 
-    def test_db_joined_quantum_nvp(self):
-        self.unit_get.return_value = 'nova.foohost.com'
-        self.network_manager.return_value = 'quantum'
-        self.neutron_plugin.return_value = 'nvp'
-        hooks.db_joined(rid='shared-db:0')
-        calls = [call(nova_database='nova',
-                      nova_username='nova',
-                      nova_hostname='nova.foohost.com',
-                      relation_id='shared-db:0')]
-        # NVP plugin requires no DB access - check it was not
-        # requested
-        [self.assertIn(c, self.relation_set.call_args_list)
-         for c in calls]
-        self.unit_get.assert_called_with('private-address')
+    def test_db_joined_with_postgresql(self):
+        self.is_relation_made.return_value = True
+
+        with self.assertRaises(Exception) as context:
+            hooks.db_joined()
+        self.assertEqual(context.exception.message,
+                         'Attempting to associate a mysql database when there '
+                         'is already associated a postgresql one')
+
+    def test_postgresql_joined_with_db(self):
+        self.is_relation_made.return_value = True
+
+        with self.assertRaises(Exception) as context:
+            hooks.pgsql_db_joined()
+        self.assertEqual(context.exception.message,
+                         'Attempting to associate a postgresql database when there '
+                         'is already associated a mysql one')
 
     @patch.object(hooks, 'CONFIGS')
     def test_db_changed_missing_relation_data(self, configs):
@@ -225,36 +219,38 @@ class NovaComputeRelationsTests(CharmTestCase):
             'shared-db relation incomplete. Peer not ready?'
         )
 
-    def _shared_db_test(self, configs, quantum=False):
+    @patch.object(hooks, 'CONFIGS')
+    def test_postgresql_db_changed_missing_relation_data(self, configs):
+        configs.complete_contexts = MagicMock()
+        configs.complete_contexts.return_value = []
+        hooks.postgresql_db_changed()
+        self.log.assert_called_with(
+            'pgsql-db relation incomplete. Peer not ready?'
+        )
+
+    def _shared_db_test(self, configs):
         configs.complete_contexts = MagicMock()
         configs.complete_contexts.return_value = ['shared-db']
         configs.write = MagicMock()
-        if quantum:
-            self.network_manager.return_value = 'quantum'
         hooks.db_changed()
 
+    def _postgresql_db_test(self, configs):
+        configs.complete_contexts = MagicMock()
+        configs.complete_contexts.return_value = ['pgsql-db']
+        configs.write = MagicMock()
+        hooks.postgresql_db_changed()
+
     @patch.object(hooks, 'CONFIGS')
-    def test_db_changed_with_data_no_quantum(self, configs):
-        self._shared_db_test(configs, quantum=False)
+    def test_db_changed_with_data(self, configs):
+        self._shared_db_test(configs)
         self.assertEquals([call('/etc/nova/nova.conf')],
                           configs.write.call_args_list)
 
     @patch.object(hooks, 'CONFIGS')
-    def test_db_changed_with_data_and_quantum_ovs(self, configs):
-        self.neutron_plugin_attribute.return_value = '/etc/quantum/plugin.conf'
-        self.neutron_plugin.return_value = 'ovs'
-        self._shared_db_test(configs, quantum=True)
-        ex = [call('/etc/nova/nova.conf'), call('/etc/quantum/plugin.conf')]
-        self.assertEquals(ex, configs.write.call_args_list)
-
-    @patch.object(hooks, 'CONFIGS')
-    def test_db_changed_with_data_and_quantum_nvp(self, configs):
-        self.neutron_plugin_attribute.return_value = '/etc/quantum/plugin.conf'
-        self.neutron_plugin.return_value = 'nvp'
-        self._shared_db_test(configs, quantum=True)
-        ex = [call('/etc/nova/nova.conf')]
-        # NVP has no compute agent for neutron; check no config files generated
-        self.assertEquals(ex, configs.write.call_args_list)
+    def test_postgresql_db_changed_with_data(self, configs):
+        self._postgresql_db_test(configs)
+        self.assertEquals([call('/etc/nova/nova.conf')],
+                          configs.write.call_args_list)
 
     @patch.object(hooks, 'CONFIGS')
     def test_image_service_missing_relation_data(self, configs):
