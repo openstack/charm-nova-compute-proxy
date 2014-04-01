@@ -71,8 +71,9 @@ def install():
 @hooks.hook('config-changed')
 @restart_on_change(restart_map())
 def config_changed():
+    global CONFIGS
     if openstack_upgrade_available('nova-common'):
-        do_openstack_upgrade(CONFIGS)
+        CONFIGS = do_openstack_upgrade()
 
     if migration_enabled() and config('migration-auth-type') == 'ssh':
         # Check-in with nova-c-c and register new ssh key, if it has just been
