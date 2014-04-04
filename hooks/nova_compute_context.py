@@ -99,6 +99,9 @@ class NovaComputeLibvirtContext(context.OSContextGenerator):
             # nova.conf
             ctxt['live_migration_uri'] = 'qemu+ssh://%s/system'
 
+        if config('instances-path') is not None:
+            ctxt['instances_path'] = config('instances-path')
+
         return ctxt
 
 
