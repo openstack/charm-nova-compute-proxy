@@ -51,7 +51,8 @@ from nova_compute_utils import (
     NOVA_CONF,
     QUANTUM_CONF, NEUTRON_CONF,
     ceph_config_file, CEPH_SECRET,
-    enable_shell, disable_shell
+    enable_shell, disable_shell,
+    fix_path_ownership
 )
 
 from nova_compute_context import CEPH_SECRET_UUID
@@ -85,6 +86,10 @@ def config_changed():
         initialize_ssh_keys(user='nova')
     else:
         disable_shell(user='nova')
+
+    if config('instances-path') is not None:
+        fp = config('instances-path')
+        fix_path_ownership(fp, user='nova')
 
     [compute_joined(rid) for rid in relation_ids('cloud-compute')]
 
