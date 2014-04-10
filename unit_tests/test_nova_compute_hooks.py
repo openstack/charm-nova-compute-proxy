@@ -45,7 +45,6 @@ TO_PATCH = [
     'migration_enabled',
     'do_openstack_upgrade',
     'network_manager',
-    'neutron_plugin_attribute',
     'neutron_plugin',
     'public_ssh_key',
     'register_configs',
@@ -207,8 +206,8 @@ class NovaComputeRelationsTests(CharmTestCase):
         with self.assertRaises(Exception) as context:
             hooks.pgsql_db_joined()
         self.assertEqual(context.exception.message,
-                         'Attempting to associate a postgresql database when there '
-                         'is already associated a mysql one')
+                         'Attempting to associate a postgresql database when'
+                         ' there is already associated a mysql one')
 
     @patch.object(hooks, 'CONFIGS')
     def test_db_changed_missing_relation_data(self, configs):

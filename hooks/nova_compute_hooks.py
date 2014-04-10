@@ -32,7 +32,6 @@ from charmhelpers.contrib.openstack.utils import (
 )
 
 from charmhelpers.contrib.storage.linux.ceph import ensure_ceph_keyring
-from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.payload.execd import execd_preinstall
 
 from nova_compute_utils import (
@@ -137,8 +136,8 @@ def db_joined(rid=None):
 def pgsql_db_joined():
     if is_relation_made('shared-db'):
         # raise error
-        e = ('Attempting to associate a postgresql database when there is already '
-             'associated a mysql one')
+        e = ('Attempting to associate a postgresql database when'
+             ' there is already associated a mysql one')
         log(e, level=ERROR)
         raise Exception(e)
 
