@@ -73,6 +73,7 @@ def _neutron_url(rid, unit):
 
 
 class NovaComputeLibvirtContext(context.OSContextGenerator):
+
     '''
     Determines various libvirt and nova options depending on live migration
     configuration.
@@ -113,6 +114,7 @@ class NovaComputeVirtContext(context.OSContextGenerator):
 
 
 class NovaComputeCephContext(context.CephContext):
+
     def __call__(self):
         ctxt = super(NovaComputeCephContext, self).__call__()
         if not ctxt:
@@ -130,6 +132,7 @@ class NovaComputeCephContext(context.CephContext):
 
 
 class CloudComputeContext(context.OSContextGenerator):
+
     '''
     Generates main context for writing nova.conf and quantum.conf templates
     from a cloud-compute relation changed hook.  Mainly used for determinig
@@ -200,6 +203,10 @@ class CloudComputeContext(context.OSContextGenerator):
                     continue
 
                 neutron_ctxt = {
+                    'auth_protocol': relation_get(
+                        'auth_protocol', **rel) or 'http',
+                    'service_protocol': relation_get(
+                        'service_protocol', **rel) or 'http',
                     'neutron_auth_strategy': 'keystone',
                     'keystone_host': relation_get(
                         'auth_host', **rel),
@@ -223,8 +230,9 @@ class CloudComputeContext(context.OSContextGenerator):
 
         neutron_ctxt['neutron_security_groups'] = _neutron_security_groups()
 
-        ks_url = 'http://%s:%s/v2.0' % (neutron_ctxt['keystone_host'],
-                                        neutron_ctxt['auth_port'])
+        ks_url = '%s://%s:%s/v2.0' % (neutron_ctxt['auth_protocol'],
+                                      neutron_ctxt['keystone_host'],
+                                      neutron_ctxt['auth_port'])
         neutron_ctxt['neutron_admin_auth_url'] = ks_url
 
         if self.network_manager == 'quantum':

@@ -5,8 +5,8 @@ from base64 import b64decode
 from copy import deepcopy
 from subprocess import check_call, check_output
 
-from charmhelpers.fetch import apt_update, apt_install
-from charmhelpers.core.host import mkdir
+from charmhelpers.fetch import apt_update, apt_upgrade, apt_install
+from charmhelpers.core.host import mkdir, service_restart
 from charmhelpers.core.hookenv import (
     config,
     log,
@@ -43,10 +43,11 @@ BASE_PACKAGES = [
     'genisoimage',  # was missing as a package dependency until raring.
 ]
 
+NOVA_CONF_DIR = "/etc/nova"
 QEMU_CONF = '/etc/libvirt/qemu.conf'
 LIBVIRTD_CONF = '/etc/libvirt/libvirtd.conf'
 LIBVIRT_BIN = '/etc/default/libvirt-bin'
-NOVA_CONF = '/etc/nova/nova.conf'
+NOVA_CONF = '%s/nova.conf' % NOVA_CONF_DIR
 
 BASE_RESOURCE_MAP = {
     QEMU_CONF: {
@@ -63,8 +64,10 @@ BASE_RESOURCE_MAP = {
     },
     NOVA_CONF: {
         'services': ['nova-compute'],
-        'contexts': [context.AMQPContext(),
-                     context.SharedDBContext(relation_prefix='nova'),
+        'contexts': [context.AMQPContext(ssl_dir=NOVA_CONF_DIR),
+                     context.SharedDBContext(
+                         relation_prefix='nova', ssl_dir=NOVA_CONF_DIR),
+                     context.PostgresqlDBContext(),
                      context.ImageServiceContext(),
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),
@@ -90,24 +93,26 @@ CEPH_RESOURCES = {
     }
 }
 
-QUANTUM_CONF = '/etc/quantum/quantum.conf'
+QUANTUM_CONF_DIR = "/etc/quantum"
+QUANTUM_CONF = '%s/quantum.conf' % QUANTUM_CONF_DIR
 
 QUANTUM_RESOURCES = {
     QUANTUM_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(),
-                     NeutronComputeContext(),
+        'contexts': [NeutronComputeContext(),
+                     context.AMQPContext(ssl_dir=QUANTUM_CONF_DIR),
                      context.SyslogContext()],
     }
 }
 
-NEUTRON_CONF = '/etc/neutron/neutron.conf'
+NEUTRON_CONF_DIR = "/etc/neutron"
+NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
         'services': [],
-        'contexts': [context.AMQPContext(),
-                     NeutronComputeContext(),
+        'contexts': [NeutronComputeContext(),
+                     context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR),
                      context.SyslogContext()],
     }
 }
@@ -200,6 +205,14 @@ def restart_map():
     return {k: v['services'] for k, v in resource_map().iteritems()}
 
 
+def services():
+    ''' Returns a list of services associate with this charm '''
+    _services = []
+    for v in restart_map().values():
+        _services = _services + v
+    return list(set(_services))
+
+
 def register_configs():
     '''
     Returns an OSTemplateRenderer object with all required configs registered.
@@ -220,10 +233,11 @@ def determine_packages():
     if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
             config('multi-host').lower() == 'yes'):
         packages.extend(['nova-api', 'nova-network'])
-    elif net_manager == 'quantum':
+    elif net_manager in ['quantum', 'neutron']:
         plugin = neutron_plugin()
-        packages.extend(
-            neutron_plugin_attribute(plugin, 'packages', net_manager))
+        pkg_lists = neutron_plugin_attribute(plugin, 'packages', net_manager)
+        for pkg_list in pkg_lists:
+            packages.extend(pkg_list)
 
     if relation_ids('ceph'):
         packages.append('ceph-common')
@@ -346,24 +360,30 @@ def import_authorized_keys(user='root', prefix=None):
         _hosts.write(b64decode(hosts))
 
 
-def do_openstack_upgrade(configs):
+def do_openstack_upgrade():
+    # NOTE(jamespage) horrible hack to make utils forget a cached value
+    import charmhelpers.contrib.openstack.utils as utils
+    utils.os_rel = None
     new_src = config('openstack-origin')
     new_os_rel = get_os_codename_install_source(new_src)
     log('Performing OpenStack upgrade to %s.' % (new_os_rel))
 
     configure_installation_source(new_src)
-    apt_update()
+    apt_update(fatal=True)
 
     dpkg_opts = [
         '--option', 'Dpkg::Options::=--force-confnew',
         '--option', 'Dpkg::Options::=--force-confdef',
     ]
 
-    apt_install(packages=determine_packages(), options=dpkg_opts, fatal=True)
+    apt_upgrade(options=dpkg_opts, fatal=True, dist=True)
+    apt_install(determine_packages(), fatal=True)
 
-    # set CONFIGS to load templates from new release and regenerate config
-    configs.set_release(openstack_release=new_os_rel)
+    # Regenerate configs in full for new release
+    configs = register_configs()
     configs.write_all()
+    [service_restart(s) for s in services()]
+    return configs
 
 
 def import_keystone_ca_cert():

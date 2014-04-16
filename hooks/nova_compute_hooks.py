@@ -5,7 +5,9 @@ import sys
 from charmhelpers.core.hookenv import (
     Hooks,
     config,
+    is_relation_made,
     log,
+    ERROR,
     relation_ids,
     relation_get,
     relation_set,
@@ -30,7 +32,6 @@ from charmhelpers.contrib.openstack.utils import (
 )
 
 from charmhelpers.contrib.storage.linux.ceph import ensure_ceph_keyring
-from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.payload.execd import execd_preinstall
 
 from nova_compute_utils import (
@@ -70,8 +71,9 @@ def install():
 @hooks.hook('config-changed')
 @restart_on_change(restart_map())
 def config_changed():
+    global CONFIGS
     if openstack_upgrade_available('nova-common'):
-        do_openstack_upgrade(CONFIGS)
+        CONFIGS = do_openstack_upgrade()
 
     if migration_enabled() and config('migration-auth-type') == 'ssh':
         # Check-in with nova-c-c and register new ssh key, if it has just been
@@ -101,6 +103,7 @@ def amqp_joined(relation_id=None):
 
 
 @hooks.hook('amqp-relation-changed')
+@hooks.hook('amqp-relation-departed')
 @restart_on_change(restart_map())
 def amqp_changed():
     if 'amqp' not in CONFIGS.complete_contexts():
@@ -116,17 +119,29 @@ def amqp_changed():
 
 @hooks.hook('shared-db-relation-joined')
 def db_joined(rid=None):
+    if is_relation_made('pgsql-db'):
+        # error, postgresql is used
+        e = ('Attempting to associate a mysql database when there is already '
+             'associated a postgresql one')
+        log(e, level=ERROR)
+        raise Exception(e)
+
     relation_set(relation_id=rid,
                  nova_database=config('database'),
                  nova_username=config('database-user'),
                  nova_hostname=unit_get('private-address'))
-    if (network_manager() in ['quantum', 'neutron']
-            and neutron_plugin() == 'ovs'):
-        # XXX: Renaming relations from quantum_* to neutron_* here.
-        relation_set(relation_id=rid,
-                     neutron_database=config('neutron-database'),
-                     neutron_username=config('neutron-database-user'),
-                     neutron_hostname=unit_get('private-address'))
+
+
+@hooks.hook('pgsql-db-relation-joined')
+def pgsql_db_joined():
+    if is_relation_made('shared-db'):
+        # raise error
+        e = ('Attempting to associate a postgresql database when'
+             ' there is already associated a mysql one')
+        log(e, level=ERROR)
+        raise Exception(e)
+
+    relation_set(database=config('database'))
 
 
 @hooks.hook('shared-db-relation-changed')
@@ -136,10 +151,15 @@ def db_changed():
         log('shared-db relation incomplete. Peer not ready?')
         return
     CONFIGS.write(NOVA_CONF)
-    nm = network_manager()
-    plugin = neutron_plugin()
-    if nm in ['quantum', 'neutron'] and plugin == 'ovs':
-        CONFIGS.write(neutron_plugin_attribute(plugin, 'config', nm))
+
+
+@hooks.hook('pgsql-db-relation-changed')
+@restart_on_change(restart_map())
+def postgresql_db_changed():
+    if 'pgsql-db' not in CONFIGS.complete_contexts():
+        log('pgsql-db relation incomplete. Peer not ready?')
+        return
+    CONFIGS.write(NOVA_CONF)
 
 
 @hooks.hook('image-service-relation-changed')
@@ -177,11 +197,6 @@ def compute_changed():
     import_authorized_keys()
     import_authorized_keys(user='nova', prefix='nova')
     import_keystone_ca_cert()
-    if (network_manager() in ['quantum', 'neutron']
-            and neutron_plugin() == 'ovs'):
-        # in case we already have a database relation, need to request
-        # access to the additional neutron database.
-        [db_joined(rid) for rid in relation_ids('shared-db')]
 
 
 @hooks.hook('ceph-relation-joined')
@@ -215,7 +230,8 @@ def ceph_changed():
 @hooks.hook('amqp-relation-broken',
             'ceph-relation-broken',
             'image-service-relation-broken',
-            'shared-db-relation-broken')
+            'shared-db-relation-broken',
+            'pgsql-db-relation-broken')
 @restart_on_change(restart_map())
 def relation_broken():
     CONFIGS.write_all()
