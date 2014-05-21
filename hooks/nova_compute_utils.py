@@ -77,8 +77,7 @@ BASE_RESOURCE_MAP = {
                      context.SubordinateConfigContext(
                          interface='nova-ceilometer',
                          service='nova',
-                         config_file=NOVA_CONF,
-                     )],
+                         config_file=NOVA_CONF)],
     },
 }
 

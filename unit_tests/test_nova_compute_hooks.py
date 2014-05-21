@@ -35,7 +35,7 @@ TO_PATCH = [
     'configure_installation_source',
     'openstack_upgrade_available',
     # nova_compute_utils
-    #'PACKAGES',
+    # 'PACKAGES',
     'create_libvirt_secret',
     'restart_map',
     'determine_packages',
