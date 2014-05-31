@@ -65,7 +65,8 @@ def install():
     execd_preinstall()
     configure_installation_source(config('openstack-origin'))
     apt_update()
-    apt_install('nova-common', fatal=True)
+    packages = ['nova-common', 'libvirt-bin']
+    apt_install(packages, fatal=True)
 
 
 @hooks.hook('config-changed')
