@@ -148,6 +148,7 @@ class CloudComputeContext(context.OSContextGenerator):
         required = filter_installed_packages(packages)
         if required:
             log('Noting to do')
+            apt_install('nova-common', fatal=True)
             #apt_install(required, fatal=True)
 
     @property
