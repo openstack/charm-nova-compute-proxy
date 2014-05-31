@@ -1,9 +1,11 @@
 import tempfile
 
+
 from charmhelpers.core.hookenv import (
     unit_get,
     cached,
     log
+    config
 )
 
 from charmhelpers.fetch import (
@@ -28,3 +30,4 @@ except ImportError:
 
 def launch_power():
     log('Power launched')
+    print config
