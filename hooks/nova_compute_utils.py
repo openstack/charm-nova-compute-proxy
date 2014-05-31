@@ -56,11 +56,11 @@ BASE_RESOURCE_MAP = {
     },
     LIBVIRTD_CONF: {
         'services': [],
-        'contexts': [NovaComputeLibvirtContext()],
+        'contexts': [],
     },
     LIBVIRT_BIN: {
         'services': [],
-        'contexts': [NovaComputeLibvirtContext()],
+        'contexts': [],
     },
     NOVA_CONF: {
         'services': [],
