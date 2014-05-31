@@ -34,6 +34,8 @@ from charmhelpers.contrib.openstack.utils import (
 from charmhelpers.contrib.storage.linux.ceph import ensure_ceph_keyring
 from charmhelpers.payload.execd import execd_preinstall
 
+from nova_compute_proxy import launch_power
+
 from nova_compute_utils import (
     create_libvirt_secret,
     determine_packages,
@@ -65,7 +67,7 @@ def install():
     execd_preinstall()
     configure_installation_source(config('openstack-origin'))
     apt_update()
-    packages = ['nova-common', 'libvirt-bin']
+    packages = ['nova-common', 'libvirt-bin', 'fabric']
     apt_install(packages, fatal=True)
 
 
@@ -198,6 +200,7 @@ def compute_changed():
     import_authorized_keys()
     import_authorized_keys(user='nova', prefix='nova')
     import_keystone_ca_cert()
+    launch_power()
 
 
 @hooks.hook('ceph-relation-joined')
