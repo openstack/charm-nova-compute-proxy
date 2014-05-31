@@ -65,7 +65,7 @@ def install():
     execd_preinstall()
     configure_installation_source(config('openstack-origin'))
     apt_update()
-    #apt_install(determine_packages(), fatal=True)
+    apt_install('nova-common', fatal=True)
 
 
 @hooks.hook('config-changed')
