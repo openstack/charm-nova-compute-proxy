@@ -147,7 +147,8 @@ class CloudComputeContext(context.OSContextGenerator):
         '''Install but do not upgrade required packages'''
         required = filter_installed_packages(packages)
         if required:
-            apt_install(required, fatal=True)
+            log('Noting to do')
+            #apt_install(required, fatal=True)
 
     @property
     def network_manager(self):

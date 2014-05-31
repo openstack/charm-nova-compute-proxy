@@ -65,7 +65,7 @@ def install():
     execd_preinstall()
     configure_installation_source(config('openstack-origin'))
     apt_update()
-    apt_install(determine_packages(), fatal=True)
+    #apt_install(determine_packages(), fatal=True)
 
 
 @hooks.hook('config-changed')
@@ -202,7 +202,8 @@ def compute_changed():
 @hooks.hook('ceph-relation-joined')
 @restart_on_change(restart_map())
 def ceph_joined():
-    apt_install(filter_installed_packages(['ceph-common']), fatal=True)
+    apt_update()
+    #apt_install(filter_installed_packages(['ceph-common']), fatal=True)
 
 
 @hooks.hook('ceph-relation-changed')
