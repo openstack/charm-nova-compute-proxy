@@ -51,19 +51,19 @@ NOVA_CONF = '%s/nova.conf' % NOVA_CONF_DIR
 
 BASE_RESOURCE_MAP = {
     QEMU_CONF: {
-        'services': [],
+        'services': ['libvirt-bin'],
         'contexts': [],
     },
     LIBVIRTD_CONF: {
-        'services': [],
-        'contexts': [],
+        'services': ['libvirt-bin'],
+        'contexts': [NovaComputeLibvirtContext()],
     },
     LIBVIRT_BIN: {
-        'services': [],
-        'contexts': [],
+        'services': ['libvirt-bin'],
+        'contexts': [NovaComputeLibvirtContext()],
     },
     NOVA_CONF: {
-        'services': [],
+        'services': ['nova-compute'],
         'contexts': [context.AMQPContext(ssl_dir=NOVA_CONF_DIR),
                      context.SharedDBContext(
                          relation_prefix='nova', ssl_dir=NOVA_CONF_DIR),
@@ -376,7 +376,7 @@ def do_openstack_upgrade():
     ]
 
     apt_upgrade(options=dpkg_opts, fatal=True, dist=True)
-    #apt_install(determine_packages(), fatal=True)
+    apt_install(determine_packages(), fatal=True)
 
     # Regenerate configs in full for new release
     configs = register_configs()

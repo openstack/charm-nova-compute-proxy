@@ -1,16 +1,4 @@
 options:
-  power_ip:
-    type: string
-    description: IPs of the PowerKVM machines
-  power_user:
-    type: string
-    description: Username of the PowerKVM machines
-  power_key:
-    type: string
-    description: power user ssh key file
-  power_repo:
-    type: string
-    descrption: url of the power repo
   openstack-origin:
     default: distro
     type: string
