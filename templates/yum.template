@@ -1,0 +1,4 @@
+[openstack-pkvm]
+name=PowerKVM OpenStack local repository
+baseurl={{ yum_repo }}
+gpgcheck=0

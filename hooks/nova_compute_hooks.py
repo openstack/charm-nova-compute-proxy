@@ -54,6 +54,12 @@ from nova_compute_utils import (
     fix_path_ownership
 )
 
+from nova_compute_proxy import (
+    configure_power,
+    launch_power
+)
+
+
 from nova_compute_context import CEPH_SECRET_UUID
 
 hooks = Hooks()
@@ -65,7 +71,7 @@ def install():
     execd_preinstall()
     configure_installation_source(config('openstack-origin'))
     apt_update()
-    apt_install(determine_packages(), fatal=True)
+    apt_install(['nova-common', 'libvirt-bin', 'fabric'], fatal=True)
 
 
 @hooks.hook('config-changed')
@@ -186,6 +192,7 @@ def compute_joined(rid=None):
             'nova_ssh_public_key': public_ssh_key(user='nova')
         }
         relation_set(relation_id=rid, **settings)
+    launch_power()
 
 
 @hooks.hook('cloud-compute-relation-changed')
@@ -197,12 +204,13 @@ def compute_changed():
     import_authorized_keys()
     import_authorized_keys(user='nova', prefix='nova')
     import_keystone_ca_cert()
+    configure_power()
 
 
 @hooks.hook('ceph-relation-joined')
 @restart_on_change(restart_map())
 def ceph_joined():
-    apt_install(filter_installed_packages(['ceph-common']), fatal=True)
+    log('Nothing to do here')
 
 
 @hooks.hook('ceph-relation-changed')

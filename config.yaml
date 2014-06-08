@@ -18,6 +18,18 @@ options:
     default: /etc/nova/nova.conf
     type: string
     description: Full path to nova.conf
+  power_user:
+    type: string
+    description: Username used to access hypervisor
+  power_key:
+    type: string
+    description: SSH KEY used to accesss hypervisor
+  power_repo:
+    type: string
+    description: RPM repository to deploy hypervisor
+  power_hosts:
+    type: string
+    description: Hosts to deploy to.
   rabbit-user:
     default: nova
     type: string
