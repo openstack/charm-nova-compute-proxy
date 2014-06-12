@@ -2,11 +2,8 @@ import os
 import pwd
 
 from base64 import b64decode
-from copy import deepcopy
 from subprocess import check_call, check_output
 
-from charmhelpers.fetch import apt_update, apt_upgrade, apt_install
-from charmhelpers.core.host import mkdir, service_restart
 from charmhelpers.core.hookenv import (
     config,
     log,
@@ -17,13 +14,12 @@ from charmhelpers.core.hookenv import (
     service_name
 )
 
+from charmhelpers.core.host import mkdir
+
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.openstack import templating, context
-from charmhelpers.contrib.openstack.alternatives import install_alternative
 
 from charmhelpers.contrib.openstack.utils import (
-    configure_installation_source,
-    get_os_codename_install_source,
     os_release
 )
 
@@ -50,20 +46,8 @@ LIBVIRT_BIN = '/etc/default/libvirt-bin'
 NOVA_CONF = '%s/nova.conf' % NOVA_CONF_DIR
 
 BASE_RESOURCE_MAP = {
-    QEMU_CONF: {
-        'services': [],
-        'contexts': [],
-    },
-    LIBVIRTD_CONF: {
-        'services': [],
-        'contexts': [],
-    },
-    LIBVIRT_BIN: {
-        'services': [],
-        'contexts': [],
-    },
     NOVA_CONF: {
-        'services': [],
+        'services': ['compute'],
         'contexts': [context.AMQPContext(ssl_dir=NOVA_CONF_DIR),
                      context.SharedDBContext(
                          relation_prefix='nova', ssl_dir=NOVA_CONF_DIR),
@@ -81,35 +65,12 @@ BASE_RESOURCE_MAP = {
     },
 }
 
-CEPH_CONF = '/etc/ceph/ceph.conf'
-CHARM_CEPH_CONF = '/var/lib/charm/{}/ceph.conf'
-CEPH_SECRET = '/etc/ceph/secret.xml'
-
-CEPH_RESOURCES = {
-    CEPH_SECRET: {
-        'contexts': [NovaComputeCephContext()],
-        'services': [],
-    }
-}
-
-QUANTUM_CONF_DIR = "/etc/quantum"
-QUANTUM_CONF = '%s/quantum.conf' % QUANTUM_CONF_DIR
-
-QUANTUM_RESOURCES = {
-    QUANTUM_CONF: {
-        'services': [],
-        'contexts': [NeutronComputeContext(),
-                     context.AMQPContext(ssl_dir=QUANTUM_CONF_DIR),
-                     context.SyslogContext()],
-    }
-}
-
 NEUTRON_CONF_DIR = "/etc/neutron"
 NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
-        'services': [],
+        'services': ['neutron'],
         'contexts': [NeutronComputeContext(),
                      context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR),
                      context.SyslogContext()],
@@ -117,81 +78,39 @@ NEUTRON_RESOURCES = {
 }
 
 
-# Maps virt-type config to a compute package(s).
-VIRT_TYPES = {
-    'kvm': ['nova-compute-kvm'],
-    'qemu': ['nova-compute-qemu'],
-    'xen': ['nova-compute-xen'],
-    'uml': ['nova-compute-uml'],
-    'lxc': ['nova-compute-lxc'],
-}
-
-
-def ceph_config_file():
-    return CHARM_CEPH_CONF.format(service_name())
-
-
 def resource_map():
     '''
     Dynamically generate a map of resources that will be managed for a single
     hook execution.
     '''
-    # TODO: Cache this on first call?
-    resource_map = deepcopy(BASE_RESOURCE_MAP)
+    resource_map = {}
+    conf_path = os.path.join('/var/lib/charm', service_name())
+    for conf in BASE_RESOURCE_MAP:
+        resource_map[os.path.join(conf_path, conf)] = BASE_RESOURCE_MAP[conf]
     net_manager = network_manager()
     plugin = neutron_plugin()
-
-    # Network manager gets set late by the cloud-compute interface.
-    # FlatDHCPManager only requires some extra packages.
-    if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
-            config('multi-host').lower() == 'yes'):
-        resource_map[NOVA_CONF]['services'].extend(
-            ['nova-api', 'nova-network']
-        )
 
     # Neutron/quantum requires additional contexts, as well as new resources
     # depending on the plugin used.
     # NOTE(james-page): only required for ovs plugin right now
     if net_manager in ['neutron', 'quantum']:
         if plugin == 'ovs':
-            if net_manager == 'quantum':
-                nm_rsc = QUANTUM_RESOURCES
-            if net_manager == 'neutron':
-                nm_rsc = NEUTRON_RESOURCES
+            nm_rsc = NEUTRON_RESOURCES
             resource_map.update(nm_rsc)
 
-            conf = neutron_plugin_attribute(plugin, 'config', net_manager)
-            svcs = neutron_plugin_attribute(plugin, 'services', net_manager)
+            conf = os.path.join(conf_path,
+                                neutron_plugin_attribute(plugin, 'config', net_manager))
             ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
                      or [])
             resource_map[conf] = {}
-            resource_map[conf]['services'] = svcs
+            resource_map[conf]['services'] = ['neutron']
             resource_map[conf]['contexts'] = ctxts
             resource_map[conf]['contexts'].append(NeutronComputeContext())
 
-            # associate the plugin agent with main network manager config(s)
-            [resource_map[nmc]['services'].extend(svcs) for nmc in nm_rsc]
-
         resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
 
-    if relation_ids('ceph'):
-        # Add charm ceph configuration to resources and
-        # ensure directory actually exists
-        mkdir(os.path.dirname(ceph_config_file()))
-        mkdir(os.path.dirname(CEPH_CONF))
-        # Install ceph config as an alternative for co-location with
-        # ceph and ceph-osd charms - nova-compute ceph.conf will be
-        # lower priority that both of these but thats OK
-        if not os.path.exists(ceph_config_file()):
-            # touch file for pre-templated generation
-            open(ceph_config_file(), 'w').close()
-        install_alternative(os.path.basename(CEPH_CONF),
-                            CEPH_CONF, ceph_config_file())
-        CEPH_RESOURCES[ceph_config_file()] = {
-            'contexts': [NovaComputeCephContext()],
-            'services': [],
-        }
-        resource_map.update(CEPH_RESOURCES)
+    for conf in resource_map:
+        mkdir(os.path.dirname(conf))
 
     return resource_map
 
@@ -216,51 +135,13 @@ def register_configs():
     '''
     Returns an OSTemplateRenderer object with all required configs registered.
     '''
-    release = os_release('nova-common')
+    release = config('openstack-release')
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
 
     for cfg, d in resource_map().iteritems():
         configs.register(cfg, d['contexts'])
     return configs
-
-
-def determine_packages():
-    packages = [] + BASE_PACKAGES
-
-    net_manager = network_manager()
-    if (net_manager in ['flatmanager', 'flatdhcpmanager'] and
-            config('multi-host').lower() == 'yes'):
-        packages.extend(['nova-api', 'nova-network'])
-    elif net_manager in ['quantum', 'neutron']:
-        plugin = neutron_plugin()
-        pkg_lists = neutron_plugin_attribute(plugin, 'packages', net_manager)
-        for pkg_list in pkg_lists:
-            packages.extend(pkg_list)
-
-    if relation_ids('ceph'):
-        packages.append('ceph-common')
-
-    virt_type = config('virt-type')
-    try:
-        packages.extend(VIRT_TYPES[virt_type])
-    except KeyError:
-        log('Unsupported virt-type configured: %s' % virt_type)
-        raise
-
-    return packages
-
-
-def migration_enabled():
-    # XXX: confirm juju-core bool behavior is the same.
-    return config('enable-live-migration')
-
-
-def quantum_enabled():
-    manager = config('network-manager')
-    if not manager:
-        return False
-    return manager.lower() == 'quantum'
 
 
 def _network_config():
@@ -359,32 +240,6 @@ def import_authorized_keys(user='root', prefix=None):
         _hosts.write(b64decode(hosts))
 
 
-def do_openstack_upgrade():
-    # NOTE(jamespage) horrible hack to make utils forget a cached value
-    import charmhelpers.contrib.openstack.utils as utils
-    utils.os_rel = None
-    new_src = config('openstack-origin')
-    new_os_rel = get_os_codename_install_source(new_src)
-    log('Performing OpenStack upgrade to %s.' % (new_os_rel))
-
-    configure_installation_source(new_src)
-    apt_update(fatal=True)
-
-    dpkg_opts = [
-        '--option', 'Dpkg::Options::=--force-confnew',
-        '--option', 'Dpkg::Options::=--force-confdef',
-    ]
-
-    apt_upgrade(options=dpkg_opts, fatal=True, dist=True)
-    #apt_install(determine_packages(), fatal=True)
-
-    # Regenerate configs in full for new release
-    configs = register_configs()
-    configs.write_all()
-    [service_restart(s) for s in services()]
-    return configs
-
-
 def import_keystone_ca_cert():
     """If provided, improt the Keystone CA cert that gets forwarded
     to compute nodes via the cloud-compute interface
@@ -408,19 +263,4 @@ def create_libvirt_secret(secret_file, secret_uuid, key):
     check_call(cmd)
     cmd = ['virsh', 'secret-set-value', '--secret', secret_uuid,
            '--base64', key]
-    check_call(cmd)
-
-
-def enable_shell(user):
-    cmd = ['usermod', '-s', '/bin/bash', user]
-    check_call(cmd)
-
-
-def disable_shell(user):
-    cmd = ['usermod', '-s', '/bin/false', user]
-    check_call(cmd)
-
-
-def fix_path_ownership(path, user='nova'):
-    cmd = ['chown', user, path]
     check_call(cmd)
