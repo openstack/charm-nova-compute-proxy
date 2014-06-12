@@ -1,5 +1,5 @@
-name: nova-compute
-summary: "OpenStack compute"
+name: nova-compute-power
+summary: "OpenStack Compute for POWER8"
 maintainer: Adam Gandelman <adamg@canonical.com>
 description: |
  OpenStack Compute, codenamed Nova, is a cloud computing fabric controller. In

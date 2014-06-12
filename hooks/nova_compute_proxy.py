@@ -69,7 +69,7 @@ def launch_power():
         log('Setup yum')
         context = {'yum_repo': config('power_repo')}
 
-        fd, filename = tempfile.mkstemp()
+        _, filename = tempfile.mkstemp()
         with open(filename, 'w') as f:
             f.write(_render_template('yum.template', context))
         execute(copy_file_as_root, filename, '/etc/yum.repos.d/openstack-power.repo')
