@@ -49,20 +49,23 @@ def install():
 @restart_on_change(restart_map(), proxy.restart_service)
 def config_changed():
     proxy.configure()    
-#    if config('enable-live-migration') and config('migration-auth-type') == 'ssh':
-#        # Check-in with nova-c-c and register new ssh key, if it has just been
-#        # generated.
-#        proxy.initialize_ssh_keys()
-#
-#    if config('enable-resize') is True:
-#        proxy.enable_shell(user='nova')
-#        proxy.initialize_ssh_keys(user='nova')
-#    else:
-#        proxy.disable_shell(user='nova')
-#
+    if config('enable-live-migration') and \
+            config('migration-auth-type') == 'ssh':
+        # Check-in with nova-c-c and register new ssh key, if it has just been
+        # generated.
+        # TODO - implement via proxy
+        # proxy.initialize_ssh_keys()
+        pass
+
+    if config('enable-resize') is True:
+        proxy.enable_shell(user='nova')
+        # TODO - implement via proxy
+        # proxy.initialize_ssh_keys(user='nova')
+    else:
+        proxy.disable_shell(user='nova')
+
     if config('instances-path') is not None:
-        fp = config('instances-path')
-        proxy.fix_path_ownership(fp, user='nova')
+        proxy.fix_path_ownership(config('instances-path'), user='nova')
 
     [compute_joined(rid) for rid in relation_ids('cloud-compute')]
 
@@ -149,8 +152,8 @@ def image_service_changed():
 
 @hooks.hook('cloud-compute-relation-joined')
 def compute_joined(rid=None):
-    # NOTE (james-page) needs review for POWER8
     pass
+# NOTE (james-page) needs review for POWER8
 #    if migration_enabled():
 #        auth_type = config('migration-auth-type')
 #        settings = {
@@ -171,6 +174,7 @@ def compute_joined(rid=None):
 def compute_changed():
     # rewriting all configs to pick up possible net or vol manager
     # config advertised from controller.
+    # TODO needs implementation for POWER8
     # import_authorized_keys()
     # import_authorized_keys(user='nova', prefix='nova')
     # import_keystone_ca_cert()
