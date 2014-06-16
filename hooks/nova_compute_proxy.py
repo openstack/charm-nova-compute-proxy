@@ -55,7 +55,6 @@ CONFIG_FILES = [
 SERVICES = ['libvirtd', 'compute', 'neutron']
 
 
-
 class POWERProxy():
 
     def __init__(self, user, ssh_key, hosts,
@@ -94,7 +93,8 @@ class POWERProxy():
         _, filename = tempfile.mkstemp()
         with open(filename, 'w') as f:
             f.write(_render_template('yum.template', context))
-        execute(copy_file_as_root, filename, '/etc/yum.repos.d/openstack-power.repo')
+        execute(copy_file_as_root, filename,
+                '/etc/yum.repos.d/openstack-power.repo')
         os.unlink(filename)
 
     def _install_packages(self):
@@ -119,10 +119,10 @@ class POWERProxy():
 
     def disable_shell(self, user):
         execute(disable_shell, user)
-    
+
     def fix_path_ownership(self, user, path):
         execute(fix_path_ownership, user, path)
-    
+
     def commit(self):
         for f in CONFIG_FILES:
             if os.path.exists(f):
@@ -131,13 +131,14 @@ class POWERProxy():
 
 def _render_template(template_name, context, template_dir=TEMPLATE_DIR):
     templates = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(template_dir))
+        loader=jinja2.FileSystemLoader(template_dir))
     template = templates.get_template(template_name)
     return template.render(context)
 
 
 def restart_on_change(restart_map, func):
-    """Restart services using provided function based on configuration files changing"""
+    """Restart services using provided function based
+       on configuration files changing"""
     def wrap(f):
         def wrapped_f(*args):
             checksums = {}

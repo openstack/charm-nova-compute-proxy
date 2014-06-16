@@ -49,7 +49,7 @@ def install():
 @hooks.hook('config-changed')
 @restart_on_change(restart_map(), proxy.restart_service)
 def config_changed():
-    proxy.configure()    
+    proxy.configure()
     if config('enable-live-migration') and \
             config('migration-auth-type') == 'ssh':
         # Check-in with nova-c-c and register new ssh key, if it has just been
@@ -89,7 +89,8 @@ def amqp_changed():
         log('amqp relation incomplete. Peer not ready?')
         return
     CONFIGS.write(NOVA_CONF)
-    if network_manager() in ['quantum', 'neutron'] and neutron_plugin() == 'ovs':
+    if network_manager() in ['quantum', 'neutron'] \
+            and neutron_plugin() == 'ovs':
         CONFIGS.write(NEUTRON_CONF)
     proxy.commit()
 
