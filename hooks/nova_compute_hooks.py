@@ -36,7 +36,8 @@ CONFIGS = register_configs()
 proxy = POWERProxy(user=config('power-user'),
                    ssh_key=config('power-key'),
                    hosts=config('power-hosts'),
-                   repository=config('power-repo'))
+                   repository=config('power-repo'),
+                   password=config('power-password'))
 
 
 @hooks.hook()

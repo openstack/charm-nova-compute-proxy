@@ -98,10 +98,10 @@ def get_os_codename_install_source(src):
         return ca_rel
 
     # Best guess match based on deb string provided
-    if src.startswith('deb') or src.startswith('ppa'):
-        for k, v in OPENSTACK_CODENAMES.iteritems():
-            if v in src:
-                return v
+    #if src.startswith('deb') or src.startswith('ppa'):
+    #    for k, v in OPENSTACK_CODENAMES.iteritems():
+    #        if v in src:
+    #            return v
 
 
 def get_os_version_install_source(src):

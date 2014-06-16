@@ -15,6 +15,9 @@ options:
   power-hosts:
     type: string
     description: POWER hosts to manager; space delimited.
+  power-password:
+    type: string
+    description: sudo password on POWER hypervisor
   rabbit-user:
     default: nova
     type: string

@@ -3,11 +3,11 @@ import tempfile
 from collections import OrderedDict
 
 from charmhelpers.core.hookenv import (
+    charm_dir,
     log,
     service_name
 )
 from charmhelpers.core.host import (
-    mkdir,
     file_hash
 )
 from charmhelpers.fetch import (
@@ -15,7 +15,6 @@ from charmhelpers.fetch import (
 )
 from fabfile import (
     add_bridge,
-    yum_update,
     copy_file_as_root,
     yum_install,
     restart_service,
@@ -60,23 +59,21 @@ SERVICES = ['libvirtd', 'compute', 'neutron']
 class POWERProxy():
 
     def __init__(self, user, ssh_key, hosts,
-                 repository):
+                 repository, password):
         if None in [user, ssh_key, hosts, repository]:
             raise Exception('Missing configuration')
         self.user = user
+        self.ssh_key = ssh_key,
         self.hosts = hosts.split()
         self.respository = repository
+        self.password = password
         self.conf_path = os.path.join('/var/lib/charm',
                                       service_name())
-        self._write_key(ssh_key)
+        self._key_filename = self._write_key()
         self._init_fabric()
 
     def _write_key(self, key):
-        path = os.path.join('/var/lib', service_name())
-        self.key_filename = os.path.join(path, 'ssh_key')
-        mkdir(path)
-        with open(self.key_filename, 'w') as f:
-            f.write(key)
+        return os.path.join(charm_dir(), 'files', self.ssh_key)
 
     def _init_fabric(self):
         env.warn_only = True
@@ -85,19 +82,15 @@ class POWERProxy():
         env.user = self.user
         env.key_filename= self.key_filename
         env.hosts = self.hosts
+        env.password = self.password
 
     def install(self):
-        self._setup_hosts()
         self._setup_yum()
         self._install_packages()
 
-    def _setup_hosts(self):
-        log('Setting up hosts')
-        execute(yum_update)
-        
     def _setup_yum(self):
         log('Setup yum')
-        context = {'yum_repo': self.repository}
+        context = {'yum_repo': self.respository}
         _, filename = tempfile.mkstemp()
         with open(filename, 'w') as f:
             f.write(_render_template('yum.template', context))

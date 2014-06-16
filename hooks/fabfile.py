@@ -4,11 +4,17 @@ from charmhelpers.fetch import (
 )
 
 try:
-    from fabric.api import roles, task, run, sudo, local, cd, settings, prefix, put
+    from fabric.api import (
+        sudo,
+        put
+    )
 except ImportError:
     apt_install(filter_installed_packages(['fabric']),
                 fatal=True)
-    from fabric.api import roles, task, run, sudo, local, cd, settings, prefix, put
+    from fabric.api import (
+        sudo,
+        put
+    )
 
 
 def yum_update():
@@ -24,7 +30,7 @@ def yum_install(packages):
 
 
 def restart_service(service):
-    sudo('service openstack-nova-%s restart' %service)
+    sudo('service openstack-nova-%s restart'  %service)
 
 
 def add_bridge():
