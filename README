@@ -1,0 +1,24 @@
+# Overview
+
+The nova-compute-power charm deploys openstack to a given Power8 compute node. 
+
+# Usage
+
+To deploy a nova-compute-power service you have to have the following:
+
+* Generate a ssh key that the charm can use to login to the compute node
+  to start installing RPMS and configuration file
+* A yum repoistiory which contains the apprioate IBM Openstack Icehouse 
+  RPMs.
+* Sudo password-les configured for the user on the compute node.
+
+Once you have this setup you must configure the charm as follow:
+
+1. Place the key to the nova-compute node in the files directory of the
+   charm.
+2. Create a config.yaml that has the following:
+
+	* power-user: username used to access and configure the power node.
+    * power-repo: Yum repository url.
+    * power-hosts: IP address of power node
+
