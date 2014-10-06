@@ -62,16 +62,16 @@ class POWERProxy():
         if None in [user, ssh_key, hosts, repository]:
             raise Exception('Missing configuration')
         self.user = user
-        self.ssh_key = ssh_key,
+        self.ssh_key = ssh_key
         self.hosts = hosts.split()
-        self.respository = repository
+        self.repository = repository
         self.password = password
         self.conf_path = os.path.join('/var/lib/charm',
                                       service_name())
-        self._key_filename = self._write_key()
+        self.key_filename = self._write_key()
         self._init_fabric()
 
-    def _write_key(self, key):
+    def _write_key(self):
         return os.path.join(charm_dir(), 'files', self.ssh_key)
 
     def _init_fabric(self):
@@ -89,7 +89,7 @@ class POWERProxy():
 
     def _setup_yum(self):
         log('Setup yum')
-        context = {'yum_repo': self.respository}
+        context = {'yum_repo': self.repository}
         _, filename = tempfile.mkstemp()
         with open(filename, 'w') as f:
             f.write(_render_template('yum.template', context))
