@@ -34,7 +34,7 @@ def restart_service(service):
 
 
 def add_bridge():
-    sudo('ovs-vsctl -- --may-exist add br-int')
+    sudo('ovs-vsctl -- --may-exist add-br br-int')
 
 
 def enable_shell(user):
