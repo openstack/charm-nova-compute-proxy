@@ -3,11 +3,11 @@ import tempfile
 from collections import OrderedDict
 
 from charmhelpers.core.hookenv import (
+    charm_dir,
     log,
     service_name
 )
 from charmhelpers.core.host import (
-    mkdir,
     file_hash
 )
 from charmhelpers.fetch import (
@@ -15,7 +15,6 @@ from charmhelpers.fetch import (
 )
 from fabfile import (
     add_bridge,
-    yum_update,
     copy_file_as_root,
     yum_install,
     restart_service,
@@ -56,27 +55,24 @@ CONFIG_FILES = [
 SERVICES = ['libvirtd', 'compute', 'neutron']
 
 
-
 class POWERProxy():
 
     def __init__(self, user, ssh_key, hosts,
-                 repository):
+                 repository, password):
         if None in [user, ssh_key, hosts, repository]:
             raise Exception('Missing configuration')
         self.user = user
+        self.ssh_key = ssh_key
         self.hosts = hosts.split()
-        self.respository = repository
+        self.repository = repository
+        self.password = password
         self.conf_path = os.path.join('/var/lib/charm',
                                       service_name())
-        self._write_key(ssh_key)
+        self.key_filename = self._write_key()
         self._init_fabric()
 
-    def _write_key(self, key):
-        path = os.path.join('/var/lib', service_name())
-        self.key_filename = os.path.join(path, 'ssh_key')
-        mkdir(path)
-        with open(self.key_filename, 'w') as f:
-            f.write(key)
+    def _write_key(self):
+        return os.path.join(charm_dir(), 'files', self.ssh_key)
 
     def _init_fabric(self):
         env.warn_only = True
@@ -85,23 +81,20 @@ class POWERProxy():
         env.user = self.user
         env.key_filename= self.key_filename
         env.hosts = self.hosts
+        env.password = self.password
 
     def install(self):
-        self._setup_hosts()
         self._setup_yum()
         self._install_packages()
 
-    def _setup_hosts(self):
-        log('Setting up hosts')
-        execute(yum_update)
-        
     def _setup_yum(self):
         log('Setup yum')
         context = {'yum_repo': self.repository}
         _, filename = tempfile.mkstemp()
         with open(filename, 'w') as f:
             f.write(_render_template('yum.template', context))
-        execute(copy_file_as_root, filename, '/etc/yum.repos.d/openstack-power.repo')
+        execute(copy_file_as_root, filename,
+                '/etc/yum.repos.d/openstack-power.repo')
         os.unlink(filename)
 
     def _install_packages(self):
@@ -126,10 +119,10 @@ class POWERProxy():
 
     def disable_shell(self, user):
         execute(disable_shell, user)
-    
+
     def fix_path_ownership(self, user, path):
         execute(fix_path_ownership, user, path)
-    
+
     def commit(self):
         for f in CONFIG_FILES:
             if os.path.exists(f):
@@ -138,13 +131,14 @@ class POWERProxy():
 
 def _render_template(template_name, context, template_dir=TEMPLATE_DIR):
     templates = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(template_dir))
+        loader=jinja2.FileSystemLoader(template_dir))
     template = templates.get_template(template_name)
     return template.render(context)
 
 
 def restart_on_change(restart_map, func):
-    """Restart services using provided function based on configuration files changing"""
+    """Restart services using provided function based
+       on configuration files changing"""
     def wrap(f):
         def wrapped_f(*args):
             checksums = {}

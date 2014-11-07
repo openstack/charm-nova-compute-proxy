@@ -1,6 +1,6 @@
 name: nova-compute-power
 summary: "OpenStack Compute for POWER8"
-maintainer: Adam Gandelman <adamg@canonical.com>
+maintainer: Chuck Short <zulcss@ubuntu.com>
 description: |
  OpenStack Compute, codenamed Nova, is a cloud computing fabric controller. In
  addition to its "native" API (the OpenStack API), it also supports the Amazon
@@ -19,14 +19,6 @@ requires:
     interface: rabbitmq
   image-service:
     interface: glance
-  ceph:
-    interface: ceph-client
-  nrpe-external-master:
-    interface: nrpe-external-master
-    scope: container
   nova-ceilometer:
     interface: nova-ceilometer
     scope: container
-peers:
-  compute-peer:
-    interface: nova

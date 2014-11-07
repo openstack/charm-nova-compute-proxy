@@ -248,7 +248,7 @@ class CloudComputeContext(context.OSContextGenerator):
         if not self.volume_service:
             return {}
 
-        os_rel = os_release('nova-common')
+        os_rel = 'icehouse'
 
         # ensure volume service is supported on specific openstack release.
         if self.volume_service == 'cinder':
