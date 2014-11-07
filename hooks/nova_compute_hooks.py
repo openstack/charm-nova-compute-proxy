@@ -19,12 +19,9 @@ from charmhelpers.fetch import (
 )
 
 from nova_compute_utils import (
-    network_manager,
-    neutron_plugin,
     restart_map,
     register_configs,
     NOVA_CONF,
-    NEUTRON_CONF,
 )
 from nova_compute_proxy import (
     POWERProxy,

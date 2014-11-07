@@ -1,6 +1,5 @@
 from charmhelpers.fetch import (
     apt_install,
-    filter_installed_packages
 )
 
 try:
@@ -9,8 +8,7 @@ try:
         put
     )
 except ImportError:
-    apt_install(filter_installed_packages(['fabric']),
-                fatal=True)
+    apt_install('fabric', fatal=True)
     from fabric.api import (
         sudo,
         put

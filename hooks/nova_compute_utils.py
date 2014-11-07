@@ -26,7 +26,6 @@ from charmhelpers.contrib.openstack.utils import (
 from nova_compute_context import (
     CloudComputeContext,
     NovaComputeLibvirtContext,
-    NovaComputeCephContext,
     NeutronComputeContext,
 )
 
