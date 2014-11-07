@@ -5,13 +5,5 @@ lint:
 	@flake8 --exclude hooks/charmhelpers hooks unit_tests
 	@charm proof
 
-test:
-	@echo Starting tests...
-	@$(PYTHON) /usr/bin/nosetests --nologcapture --with-coverage  unit_tests
-
 sync:
 	@charm-helper-sync -c charm-helpers.yaml
-
-publish: lint test
-	bzr push lp:charms/nova-compute
-	bzr push lp:charms/trusty/nova-compute
