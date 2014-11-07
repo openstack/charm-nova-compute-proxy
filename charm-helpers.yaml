@@ -8,5 +8,5 @@ include:
     - contrib.hahelpers:
         - apache
         - cluster
-    - contrib.network.ovs
+    - contrib.network
     - payload.execd
