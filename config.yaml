@@ -37,14 +37,6 @@ options:
     description: |
       By default, all services will log into their corresponding log files.
       Setting this to True will force all services to log to the syslog.
-  database-user:
-    default: nova
-    type: string
-    description: Username for database access
-  database:
-    default: nova
-    type: string
-    description: Database name
   instances-path:
     type: string
     default:

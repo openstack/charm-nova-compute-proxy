@@ -50,26 +50,10 @@ def install():
 @restart_on_change(restart_map(), proxy.restart_service)
 def config_changed():
     proxy.configure()
-    if config('enable-live-migration') and \
-            config('migration-auth-type') == 'ssh':
-        # Check-in with nova-c-c and register new ssh key, if it has just been
-        # generated.
-        # TODO - implement via proxy
-        # proxy.initialize_ssh_keys()
-        pass
-
-    if config('enable-resize') is True:
-        proxy.enable_shell(user='nova')
-        # TODO - implement via proxy
-        # proxy.initialize_ssh_keys(user='nova')
-    else:
-        proxy.disable_shell(user='nova')
-
     if config('instances-path') is not None:
         proxy.fix_path_ownership(config('instances-path'), user='nova')
 
     [compute_joined(rid) for rid in relation_ids('cloud-compute')]
-
     CONFIGS.write_all()
     proxy.commit()
 
@@ -88,10 +72,7 @@ def amqp_changed():
     if 'amqp' not in CONFIGS.complete_contexts():
         log('amqp relation incomplete. Peer not ready?')
         return
-    CONFIGS.write(NOVA_CONF)
-    if network_manager() in ['quantum', 'neutron'] \
-            and neutron_plugin() == 'ovs':
-        CONFIGS.write(NEUTRON_CONF)
+    CONFIGS.write_all()
     proxy.commit()
 
 
@@ -155,31 +136,11 @@ def image_service_changed():
 @hooks.hook('cloud-compute-relation-joined')
 def compute_joined(rid=None):
     pass
-# NOTE (james-page) needs review for POWER8
-#    if migration_enabled():
-#        auth_type = config('migration-auth-type')
-#        settings = {
-#            'migration_auth_type': auth_type
-#        }
-#        if auth_type == 'ssh':
-#            settings['ssh_public_key'] = public_ssh_key()
-#        relation_set(relation_id=rid, **settings)
-#    if config('enable-resize'):
-#        settings = {
-#            'nova_ssh_public_key': public_ssh_key(user='nova')
-#        }
-#        relation_set(relation_id=rid, **settings)
 
 
 @hooks.hook('cloud-compute-relation-changed')
 @restart_on_change(restart_map(), proxy.restart_service)
 def compute_changed():
-    # rewriting all configs to pick up possible net or vol manager
-    # config advertised from controller.
-    # TODO needs implementation for POWER8
-    # import_authorized_keys()
-    # import_authorized_keys(user='nova', prefix='nova')
-    # import_keystone_ca_cert()
     CONFIGS.write_all()
     proxy.commit()
 

@@ -11,10 +11,6 @@ provides:
   cloud-compute:
     interface: nova-compute
 requires:
-  shared-db:
-    interface: mysql-shared
-  pgsql-db:
-    interface: pgsql
   amqp:
     interface: rabbitmq
   image-service:
