@@ -5,18 +5,23 @@ options:
     description: OpenStack release to use for configuration of POWER hypervisor.
   power-user:
     type: string
+    default:
     description: Username used to access POWER hypervisors.
   power-key:
     type: string
+    default:
     description: SSH key to use to accesss POWER hypervisors.
   power-repo:
     type: string
+    default:
     description: RPM repository of OpenStack packages to deploy to POWER hypervisors.
   power-hosts:
     type: string
+    default:
     description: POWER hosts to manager; space delimited.
   power-password:
     type: string
+    default:
     description: sudo password on POWER hypervisor
   rabbit-user:
     default: nova
@@ -25,7 +30,7 @@ options:
   rabbit-vhost:
     default: openstack
     type: string
-    decsription: Rabbitmq vhost
+    description: Rabbitmq vhost
   use-syslog:
     type: boolean
     default: False
@@ -40,56 +45,11 @@ options:
     default: nova
     type: string
     description: Database name
-  multi-host:
-    default: "yes"
-    type: string
-    description: Whether to run nova-api and nova-network on the compute nodes.
-  enable-resize:
-    default: False
-    type: boolean
-    description: Enable instance resizing, which requires that passwordless SSH
-      access be setup between compute hosts.
-  enable-live-migration:
-    default: False
-    type: boolean
-    description: Configure libvirt for live migration.
-  migration-auth-type:
-    default: sasl
-    type: string
-    description: |
-      TCP authentication scheme for libvirt live migration.  Available options
-      include sasl or none.
-  # needed if using flatmanager
-  bridge-interface:
-    default: br100
-    type: string
-    description: Bridge interface to be configured
-  bridge-ip:
-    default: 11.0.0.1
-    type: string
-    description: IP to be assigned to bridge interface
-  bridge-netmask:
-    default: 255.255.255.0
-    type: string
-    description: Netmask to be assigned to bridge interface
-  # needed if using flatdhcpmanager
-  flat-interface:
-    default: eth1
-    type: string
-    description: Network interface on which to build bridge
   instances-path:
     type: string
+    default:
     description: Instance path to use - empty means default of /var/lib/nova/instances
   config-flags:
     type: string
+    default:
     description: Comma separated list of key=value config flags to be set in nova.conf.
-  nagios_context:
-    default: "juju"
-    type: string
-    description: |
-      Used by the nrpe-external-master subordinate charm.
-      A string that will be prepended to instance name to set the host name
-      in nagios. So for instance the hostname would be something like:
-          juju-myservice-0
-      If you're running multiple environments with the same services in them
-      this allows you to differentiate between them.

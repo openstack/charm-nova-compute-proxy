@@ -79,7 +79,7 @@ class POWERProxy():
         env.connection_attempts = 10
         env.timeout = 10
         env.user = self.user
-        env.key_filename= self.key_filename
+        env.key_filename = self.key_filename
         env.hosts = self.hosts
         env.password = self.password
 
@@ -150,7 +150,7 @@ def restart_on_change(restart_map, func):
                 if checksums[path] != file_hash(path):
                     restarts += restart_map[path]
             services_list = list(OrderedDict.fromkeys(restarts))
-            for service_name in services_list:
-                func(service_name)
+            for s_name in services_list:
+                func(s_name)
         return wrapped_f
     return wrap

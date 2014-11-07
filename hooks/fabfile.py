@@ -30,7 +30,7 @@ def yum_install(packages):
 
 
 def restart_service(service):
-    sudo('service openstack-nova-%s restart'  %service)
+    sudo('service openstack-nova-%s restart' % service)
 
 
 def add_bridge():

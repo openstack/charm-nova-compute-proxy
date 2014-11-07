@@ -44,32 +44,32 @@ def _network_manager():
 
 
 def _neutron_security_groups():
-        '''
-        Inspects current cloud-compute relation and determine if nova-c-c has
-        instructed us to use neutron security groups.
-        '''
-        for rid in relation_ids('cloud-compute'):
-            for unit in related_units(rid):
-                groups = [
-                    relation_get('neutron_security_groups',
-                                 rid=rid, unit=unit),
-                    relation_get('quantum_security_groups',
-                                 rid=rid, unit=unit)
-                ]
-                if ('yes' in groups or 'Yes' in groups):
-                    return True
-        return False
+    '''
+    Inspects current cloud-compute relation and determine if nova-c-c has
+    instructed us to use neutron security groups.
+    '''
+    for rid in relation_ids('cloud-compute'):
+        for unit in related_units(rid):
+            groups = [
+                relation_get('neutron_security_groups',
+                             rid=rid, unit=unit),
+                relation_get('quantum_security_groups',
+                             rid=rid, unit=unit)
+            ]
+            if ('yes' in groups or 'Yes' in groups):
+                return True
+    return False
 
 
 def _neutron_plugin():
-        from nova_compute_utils import neutron_plugin
-        return neutron_plugin()
+    from nova_compute_utils import neutron_plugin
+    return neutron_plugin()
 
 
 def _neutron_url(rid, unit):
-        # supports legacy relation settings.
-        return (relation_get('neutron_url', rid=rid, unit=unit) or
-                relation_get('quantum_url', rid=rid, unit=unit))
+    # supports legacy relation settings.
+    return (relation_get('neutron_url', rid=rid, unit=unit) or
+            relation_get('quantum_url', rid=rid, unit=unit))
 
 
 class NovaComputeLibvirtContext(context.OSContextGenerator):

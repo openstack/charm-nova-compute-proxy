@@ -99,7 +99,8 @@ def resource_map():
             resource_map.update(nm_rsc)
 
             conf = os.path.join(conf_path,
-                    neutron_plugin_attribute(plugin, 'config', net_manager))
+                                neutron_plugin_attribute(plugin, 'config',
+                                                         net_manager))
             ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
                      or [])
             resource_map[conf] = {}
