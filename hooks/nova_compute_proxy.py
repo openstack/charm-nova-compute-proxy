@@ -41,7 +41,7 @@ except ImportError:
 TEMPLATE_DIR = 'templates'
 
 PACKAGES = ['openstack-nova-compute',
-            'openstack-neutron',
+            'openstack-neutron-ml2',
             'openstack-neutron-openvswitch',
             'python-neutronclient']
 
