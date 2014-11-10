@@ -20,8 +20,6 @@ def yum_update():
 
 
 def copy_file_as_root(src, dest):
-    print(src)
-    print(dest)
     put(src, dest, use_sudo=True)
 
 

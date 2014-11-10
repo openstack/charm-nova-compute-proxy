@@ -102,9 +102,8 @@ class POWERProxy():
         self.add_bridges()
 
     def copy_file(self, target):
-        print(os.path.join(CHARM_SCRATCH_DIR, target))
         execute(copy_file_as_root,
-                os.path.join(CHARM_SCRATCH_DIR, target),
+                "%s/%s" % (CHARM_SCRATCH_DIR, target),
                 target)
 
     def restart_service(self, service):
@@ -125,8 +124,7 @@ class POWERProxy():
 
     def commit(self):
         for f in CONFIG_FILES:
-            if os.path.exists(os.path.join(CHARM_SCRATCH_DIR,
-                                           f)):
+            if os.path.exists("%s/%s" % (CHARM_SCRATCH_DIR, f)):
                 self.copy_file(f)
 
 
