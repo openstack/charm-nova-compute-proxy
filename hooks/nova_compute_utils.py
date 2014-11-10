@@ -8,7 +8,6 @@ from charmhelpers.core.hookenv import (
     service_name
 )
 from charmhelpers.core.host import mkdir
-from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.openstack import templating, context
 
 from nova_compute_context import (
