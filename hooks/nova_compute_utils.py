@@ -73,20 +73,15 @@ def resource_map():
             nm_rsc = NEUTRON_RESOURCES
             resource_map.update(nm_rsc)
 
-            conf = os.path.join(conf_path,
-                                neutron_plugin_attribute(plugin, 'config',
-                                                         net_manager))
-            ctxts = (neutron_plugin_attribute(plugin, 'contexts', net_manager)
-                     or [])
+            conf = '/etc/neutron/plugins/ml2/ml2_conf.ini'
             resource_map[conf] = {}
-            resource_map[conf]['services'] = ['neutron']
-            resource_map[conf]['contexts'] = ctxts
-            resource_map[conf]['contexts'].append(NeutronComputeContext())
+            resource_map[conf]['services'] = ['neutron-openvswitch-agent']
+            resource_map[conf]['contexts'] = [NeutronPowerComputeContext()]
         else:
             raise ValueError("Only Neutron ml2/ovs plugin "
                              "is supported on this platform")
 
-        resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
+        resource_map[NOVA_CONF]['contexts'].append(NeutronPowerComputeContext())
 
     for conf in resource_map:
         mkdir(os.path.dirname(conf))
