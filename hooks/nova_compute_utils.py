@@ -18,7 +18,9 @@ from nova_compute_context import (
 
 TEMPLATES = 'templates/'
 
-NOVA_CONF_DIR = "/etc/nova"
+CHARM_SCRATCH_DIR = '/var/lib/charm/%s' % service_name()
+
+NOVA_CONF_DIR = "%s/etc/nova" % CHARM_SCRATCH_DIR
 NOVA_CONF = '%s/nova.conf' % NOVA_CONF_DIR
 
 BASE_RESOURCE_MAP = {
@@ -38,7 +40,7 @@ BASE_RESOURCE_MAP = {
     },
 }
 
-NEUTRON_CONF_DIR = "/etc/neutron"
+NEUTRON_CONF_DIR = "%s/etc/neutron" % CHARM_SCRATCH_DIR
 NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 
 NEUTRON_RESOURCES = {

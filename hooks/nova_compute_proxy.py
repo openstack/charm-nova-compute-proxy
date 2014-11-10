@@ -23,6 +23,7 @@ from fabfile import (
     fix_path_ownership,
     fix_ml2_plugin_config
 )
+from nova_compute_utils import CHARM_SCRATCH_DIR
 
 try:
     import jinja2
@@ -48,8 +49,7 @@ PACKAGES = ['openstack-nova-compute',
 CONFIG_FILES = [
     '/etc/neutron/neutron.conf',
     '/etc/neutron/plugins/ml2/ml2_conf.ini',
-    '/etc/nova/nova.conf',
-    '/etc/ceilometer/ceilometer.conf']
+    '/etc/nova/nova.conf']
 
 SERVICES = ['libvirtd', 'compute', 'neutron']
 
@@ -65,8 +65,7 @@ class POWERProxy():
         self.hosts = hosts.split()
         self.repository = repository
         self.password = password
-        self.conf_path = os.path.join('/var/lib/charm',
-                                      service_name())
+        self.conf_path = CHARM_SCRATCH_DIR
         self.key_filename = self._write_key()
         self._init_fabric()
 
@@ -129,7 +128,8 @@ class POWERProxy():
 
     def commit(self):
         for f in CONFIG_FILES:
-            if os.path.exists(f):
+            if os.path.exists(os.path.join(CHARM_SCRATCH_DIR,
+                                           f)):
                 self.copy_file(f)
 
 
