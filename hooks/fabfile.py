@@ -5,13 +5,15 @@ from charmhelpers.fetch import (
 try:
     from fabric.api import (
         sudo,
-        put
+        put,
+        env
     )
 except ImportError:
     apt_install('fabric', fatal=True)
     from fabric.api import (
         sudo,
-        put
+        put,
+        env
     )
 
 
@@ -50,3 +52,7 @@ def fix_path_ownership(path, user='nova'):
 def fix_ml2_plugin_config():
     sudo('sed -i "s!openvswitch/ovs_neutron_plugin.ini'
          '!ml2/ml2_conf.ini!g" /etc/init.d/neutron-openvswitch-agent')
+
+
+def fix_local_ip(f):
+    sudo('sed -i "s!LOCAL_IP!%s!g" %s' % (env.host, f))

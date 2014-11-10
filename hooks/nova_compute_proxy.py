@@ -20,7 +20,8 @@ from fabfile import (
     enable_shell,
     disable_shell,
     fix_path_ownership,
-    fix_ml2_plugin_config
+    fix_ml2_plugin_config,
+    fix_local_ip
 )
 from nova_compute_utils import CHARM_SCRATCH_DIR
 
@@ -126,6 +127,10 @@ class POWERProxy():
         for f in CONFIG_FILES:
             if os.path.exists("%s%s" % (CHARM_SCRATCH_DIR, f)):
                 self.copy_file(f)
+        self._fixup_local_ips()
+
+    def _fixup_local_ips(self):
+        execute(fix_local_ip, '/etc/neutron/plugins/ml2/ml2_conf.ini')
 
 
 def _render_template(template_name, context, template_dir=TEMPLATE_DIR):
