@@ -49,4 +49,4 @@ def fix_path_ownership(path, user='nova'):
 
 def fix_ml2_plugin_config():
     sudo('sed -i "s!openvswitch/ovs_neutron_plugin.ini'
-         '!ml2/ml2_conf.ini! /etc/init.d/neutron-openvswitch-agent')
+         '!ml2/ml2_conf.ini!g" /etc/init.d/neutron-openvswitch-agent')
