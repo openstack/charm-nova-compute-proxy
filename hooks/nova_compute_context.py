@@ -198,7 +198,7 @@ class CloudComputeContext(context.OSContextGenerator):
         return ctxt
 
 
-class NeutronPowerComputeContext(context.OSContextGenerator):
+class NeutronPowerComputeContext(context.NeutronContext):
     interfaces = []
 
     @property
