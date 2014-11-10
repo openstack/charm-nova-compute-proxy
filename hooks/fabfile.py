@@ -31,8 +31,8 @@ def restart_service(service):
     sudo('service %s restart' % service)
 
 
-def add_bridge():
-    sudo('ovs-vsctl -- --may-exist add-br br-int')
+def add_bridge(bridge_name):
+    sudo('ovs-vsctl -- --may-exist add-br %' % bridge_name)
 
 
 def enable_shell(user):

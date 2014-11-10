@@ -102,6 +102,7 @@ def relation_broken():
 
 @hooks.hook('upgrade-charm')
 def upgrade_charm():
+    proxy.install()
     for r_id in relation_ids('amqp'):
         amqp_joined(relation_id=r_id)
 

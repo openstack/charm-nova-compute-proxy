@@ -105,7 +105,7 @@ class POWERProxy():
         execute(fix_ml2_plugin_config)
 
     def configure(self):
-        self.add_bridge()
+        self.add_bridges()
 
     def copy_file(self, target):
         execute(copy_file_as_root,
@@ -115,8 +115,9 @@ class POWERProxy():
     def restart_service(self, service):
         execute(restart_service, service)
 
-    def add_bridge(self):
-        execute(add_bridge)
+    def add_bridges(self):
+        execute(add_bridge, 'br-int')
+        execute(add_bridge, 'br-data')
 
     def enable_shell(self, user):
         execute(enable_shell, user)
