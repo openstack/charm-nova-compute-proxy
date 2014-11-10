@@ -74,7 +74,7 @@ def resource_map():
             nm_rsc = NEUTRON_RESOURCES
             resource_map.update(nm_rsc)
 
-            conf = '/etc/neutron/plugins/ml2/ml2_conf.ini'
+            conf = '%s/etc/neutron/plugins/ml2/ml2_conf.ini' % CHARM_SCRATCH_DIR
             resource_map[conf] = {}
             resource_map[conf]['services'] = ['neutron-openvswitch-agent']
             resource_map[conf]['contexts'] = [NeutronPowerComputeContext()]
