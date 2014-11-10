@@ -5,7 +5,6 @@ from collections import OrderedDict
 from charmhelpers.core.hookenv import (
     charm_dir,
     log,
-    service_name
 )
 from charmhelpers.core.host import (
     file_hash
@@ -50,8 +49,6 @@ CONFIG_FILES = [
     '/etc/neutron/neutron.conf',
     '/etc/neutron/plugins/ml2/ml2_conf.ini',
     '/etc/nova/nova.conf']
-
-SERVICES = ['libvirtd', 'compute', 'neutron']
 
 
 class POWERProxy():
