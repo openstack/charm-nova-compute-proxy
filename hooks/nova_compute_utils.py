@@ -153,8 +153,6 @@ def network_manager():
     manager = _network_config().get('network_manager')
     if manager:
         manager = manager.lower()
-        if manager not in ['quantum', 'neutron']:
-            raise ValueError("Only Neutron is supported on this platform")
-        else:
+        if manager in ['quantum', 'neutron']:
             return 'neutron'
     return manager
