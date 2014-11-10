@@ -15,6 +15,32 @@ def _network_manager():
     return manager()
 
 
+def _neutron_api_settings():
+    '''
+    Inspects current neutron-plugin relation
+    '''
+    neutron_settings = {
+        'neutron_security_groups': False,
+        'l2_population': True,
+        'overlay_network_type': 'gre',
+    }
+    for rid in relation_ids('neutron-plugin-api'):
+        for unit in related_units(rid):
+            rdata = relation_get(rid=rid, unit=unit)
+            if 'l2-population' not in rdata:
+                continue
+            neutron_settings = {
+                'l2_population': rdata['l2-population'],
+                'neutron_security_groups': rdata['neutron-security-groups'],
+                'overlay_network_type': rdata['overlay-network-type'],
+            }
+            # Override with configuration if set to true
+            if config('disable-security-groups'):
+                neutron_settings['neutron_security_groups'] = False
+            return neutron_settings
+    return neutron_settings
+
+
 def _neutron_security_groups():
     '''
     Inspects current cloud-compute relation and determine if nova-c-c has
@@ -222,5 +248,5 @@ class NeutronPowerComputeContext(context.NeutronContext):
             'neutron_security_groups': self.neutron_security_groups,
             'config': '/etc/neutron/plugins/ml2/ml2_conf.ini'
         }
-
+        ovs_ctxt.update(_neutron_api_settings())
         return ovs_ctxt

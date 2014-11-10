@@ -59,5 +59,13 @@ options:
     description: |
       The data port will be added to br-data and will allow usage of flat or VLAN
       network types with Neutron.
-
+  disable-security-groups:
+    type: boolean
+    default: false
+    description: |
+      Disable neutron based security groups - setting this configuration option
+      will override any settings configured via the neutron-api charm.
+      .
+      BE CAREFUL - this option allows you to disable all port level security within
+      an OpenStack cloud.
 
