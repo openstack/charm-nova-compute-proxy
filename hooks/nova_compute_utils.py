@@ -82,9 +82,6 @@ def resource_map():
             resource_map[conf]['services'] = ['neutron']
             resource_map[conf]['contexts'] = ctxts
             resource_map[conf]['contexts'].append(NeutronComputeContext())
-        else:
-            raise ValueError("Only Neutron ml2/ovs plugin "
-                             "is supported on this platform")
 
         resource_map[NOVA_CONF]['contexts'].append(NeutronComputeContext())
     else:
