@@ -1,10 +1,13 @@
 name: nova-compute-power
-summary: "OpenStack Compute for POWER8"
+summary: OpenStack Compute for POWER8
 maintainer: Chuck Short <zulcss@ubuntu.com>
 description: |
  OpenStack Compute, codenamed Nova, is a cloud computing fabric controller. In
  addition to its "native" API (the OpenStack API), it also supports the Amazon
  EC2 API.
+ .
+ This charm acts as a proxy to remote configure multiple PowerKVM hosts, which
+ don't run Ubuntu.
 tags:
   - openstack
 provides:
@@ -15,6 +18,4 @@ requires:
     interface: rabbitmq
   image-service:
     interface: glance
-  nova-ceilometer:
-    interface: nova-ceilometer
-    scope: container
+

@@ -32,7 +32,7 @@ def restart_service(service):
 
 
 def add_bridge(bridge_name):
-    sudo('ovs-vsctl -- --may-exist add-br %' % bridge_name)
+    sudo('ovs-vsctl -- --may-exist add-br %s' % bridge_name)
 
 
 def enable_shell(user):

@@ -43,8 +43,7 @@ TEMPLATE_DIR = 'templates'
 PACKAGES = ['openstack-nova-compute',
             'openstack-neutron',
             'openstack-neutron-openvswitch',
-            'python-neutronclient',
-            'ceilometer-compute-agent']
+            'python-neutronclient']
 
 CONFIG_FILES = [
     '/etc/neutron/neutron.conf',
