@@ -73,6 +73,7 @@ class POWERProxy():
         env.user = self.user
         env.hosts = self.hosts
         env.password = self.password
+        env.use_ssh_config = True
 
     def install(self):
         self._setup_yum()
