@@ -61,22 +61,16 @@ class POWERProxy():
         if None in [user, ssh_key, hosts, repository]:
             raise Exception('Missing configuration')
         self.user = user
-        self.ssh_key = ssh_key
         self.hosts = hosts.split()
         self.repository = repository
         self.password = password
-        self.key_filename = self._write_key()
         self._init_fabric()
-
-    def _write_key(self):
-        return os.path.join(charm_dir(), 'files', self.ssh_key)
 
     def _init_fabric(self):
         env.warn_only = True
         env.connection_attempts = 10
         env.timeout = 10
         env.user = self.user
-        env.key_filename = self.key_filename
         env.hosts = self.hosts
         env.password = self.password
 

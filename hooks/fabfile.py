@@ -38,8 +38,9 @@ def add_bridge(bridge_name):
 
 
 def add_bridge_port(bridge_name, port):
-    sudo('ovs-vsctl -- --may-exist add-port %s %s' % (bridge_name,
-                                                      port))
+    sudo('ovs-vsctl -- --may-exist '
+         'add-port %s %s' % (bridge_name,
+                             port))
     sudo('ip link set %s up' % port)
     sudo('ip link set %s promisc on' % port)
 
