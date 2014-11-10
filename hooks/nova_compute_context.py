@@ -198,7 +198,7 @@ class CloudComputeContext(context.OSContextGenerator):
         return ctxt
 
 
-class NeutronComputeContext(context.NeutronContext):
+class NeutronPowerComputeContext(context.OSContextGenerator):
     interfaces = []
 
     @property
@@ -218,13 +218,13 @@ class NeutronComputeContext(context.NeutronContext):
         pass
 
     def ovs_ctxt(self):
-        # In addition to generating config context, ensure the OVS service
-        # is running and the OVS bridge exists. Also need to ensure
-        # local_ip points to actual IP, not hostname.
-        ovs_ctxt = super(NeutronComputeContext, self).ovs_ctxt()
-        if not ovs_ctxt:
-            return {}
+        # TODO(jamespage) needs to be remote IP - so this won't work
+        ovs_ctxt = {
+            'core_plugin': 'neutron.plugins.ml2.plugin.Ml2Plugin',
+            'neutron_plugin': 'ovs',
+            'neutron_security_groups': self.neutron_security_groups,
+            'local_ip': get_host_ip(unit_get('private-address')),
+            'config': '/etc/neutron/plugins/ml2/ml2_conf.ini'
+        }
 
-        # TODO(jamespage) needs to be remote IP - so this won't work always
-        ovs_ctxt['local_ip'] = get_host_ip(unit_get('private-address'))
         return ovs_ctxt

@@ -14,7 +14,7 @@ from charmhelpers.contrib.openstack import templating, context
 from nova_compute_context import (
     CloudComputeContext,
     NovaComputeVirtContext,
-    NeutronComputeContext,
+    NeutronPowerComputeContext,
 )
 
 TEMPLATES = 'templates/'
@@ -45,7 +45,7 @@ NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
         'services': ['neutron-openvswitch-agent'],
-        'contexts': [NeutronComputeContext(),
+        'contexts': [NeutronPowerComputeContext(),
                      context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR),
                      context.SyslogContext(),
                      context.LogLevelContext()],
