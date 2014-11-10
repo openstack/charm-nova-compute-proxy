@@ -218,12 +218,10 @@ class NeutronPowerComputeContext(context.NeutronContext):
         pass
 
     def ovs_ctxt(self):
-        # TODO(jamespage) needs to be remote IP - so this won't work
         ovs_ctxt = {
             'core_plugin': 'neutron.plugins.ml2.plugin.Ml2Plugin',
             'neutron_plugin': 'ovs',
             'neutron_security_groups': self.neutron_security_groups,
-            'local_ip': get_host_ip(unit_get('private-address')),
             'config': '/etc/neutron/plugins/ml2/ml2_conf.ini'
         }
 
