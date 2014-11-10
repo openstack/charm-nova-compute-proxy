@@ -62,7 +62,6 @@ class POWERProxy():
         self.hosts = hosts.split()
         self.repository = repository
         self.password = password
-        self.conf_path = CHARM_SCRATCH_DIR
         self.key_filename = self._write_key()
         self._init_fabric()
 
@@ -104,7 +103,7 @@ class POWERProxy():
 
     def copy_file(self, target):
         execute(copy_file_as_root,
-                os.path.join(self.conf_path, target),
+                os.path.join(CHARM_SCRATCH_DIR, target),
                 target)
 
     def restart_service(self, service):
