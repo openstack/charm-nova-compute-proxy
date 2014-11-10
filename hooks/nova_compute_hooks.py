@@ -28,6 +28,7 @@ from nova_compute_proxy import (
 hooks = Hooks()
 CONFIGS = register_configs()
 proxy = POWERProxy(user=config('power-user'),
+                   ssh_key=config('power-key'),
                    hosts=config('power-hosts'),
                    repository=config('power-repo'),
                    password=config('power-password'))
@@ -35,7 +36,7 @@ proxy = POWERProxy(user=config('power-user'),
 
 @hooks.hook()
 def install():
-    apt_install('fabric', fatal=True)
+    apt_install(['fabric'], fatal=True)
     proxy.install()
 
 

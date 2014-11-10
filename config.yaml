@@ -7,6 +7,10 @@ options:
     type: string
     default:
     description: Username used to access POWER hypervisors.
+  power-key:
+    type: string
+    default:
+    description: SSH key to use to accesss POWER hypervisors.
   power-repo:
     type: string
     default:
@@ -14,7 +18,7 @@ options:
   power-hosts:
     type: string
     default:
-    description: POWER hosts to manager; space delimited and must be IP addresses.
+    description: POWER hosts to manager; space delimited.
   power-password:
     type: string
     default:
