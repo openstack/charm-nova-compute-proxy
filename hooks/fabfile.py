@@ -28,7 +28,7 @@ def yum_install(packages):
 
 
 def restart_service(service):
-    sudo('service openstack-nova-%s restart' % service)
+    sudo('service %s restart' % service)
 
 
 def add_bridge():
@@ -45,3 +45,8 @@ def disable_shell(user):
 
 def fix_path_ownership(path, user='nova'):
     sudo('chown {} {}'.format(user, path))
+
+
+def fix_ml2_plugin_config():
+    sudo('sed -i "s!openvswitch/ovs_neutron_plugin.ini'
+         '!ml2/ml2_conf.ini! /etc/init.d/neutron-openvswitch-agent')

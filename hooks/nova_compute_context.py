@@ -1,40 +1,14 @@
-
 from charmhelpers.contrib.openstack import context
-
-from charmhelpers.core.host import service_running, service_start
-from charmhelpers.fetch import apt_install, filter_installed_packages
-
+from charmhelpers.contrib.openstack.utils import get_host_ip
 from charmhelpers.core.hookenv import (
     config,
     log,
     relation_get,
     relation_ids,
     related_units,
-    service_name,
     unit_get,
     ERROR,
 )
-
-from charmhelpers.contrib.openstack.utils import get_host_ip, os_release
-from charmhelpers.contrib.network.ovs import add_bridge
-
-
-# This is just a label and it must be consistent across
-# nova-compute nodes to support live migration.
-CEPH_SECRET_UUID = '514c9fca-8cbe-11e2-9c52-3bc8c7819472'
-
-OVS_BRIDGE = 'br-int'
-
-
-def _save_flag_file(path, data):
-    '''
-    Saves local state about plugin or manager to specified file.
-    '''
-    # Wonder if we can move away from this now?
-    if data is None:
-        return
-    with open(path, 'wb') as out:
-        out.write(data)
 
 
 # compatability functions to help with quantum -> neutron transition
@@ -72,82 +46,27 @@ def _neutron_url(rid, unit):
             relation_get('quantum_url', rid=rid, unit=unit))
 
 
-class NovaComputeLibvirtContext(context.OSContextGenerator):
-
-    '''
-    Determines various libvirt and nova options depending on live migration
-    configuration.
-    '''
-    interfaces = []
-
-    def __call__(self):
-        # distro defaults
-        ctxt = {
-            # /etc/default/libvirt-bin
-            'libvirtd_opts': '-d',
-            # /etc/libvirt/libvirtd.conf (
-            'listen_tls': 0,
-        }
-
-        # enable tcp listening if configured for live migration.
-        if config('enable-live-migration'):
-            ctxt['libvirtd_opts'] += ' -l'
-
-        if config('migration-auth-type') in ['none', 'None', 'ssh']:
-            ctxt['listen_tls'] = 0
-
-        if config('migration-auth-type') == 'ssh':
-            # nova.conf
-            ctxt['live_migration_uri'] = 'qemu+ssh://%s/system'
-
-        if config('instances-path') is not None:
-            ctxt['instances_path'] = config('instances-path')
-
-        return ctxt
-
-
 class NovaComputeVirtContext(context.OSContextGenerator):
     interfaces = []
 
     def __call__(self):
+        ctxt = {}
+        if config('instances-path') is not None:
+            ctxt['instances_path'] = config('instances-path')
         return {}
-
-
-class NovaComputeCephContext(context.CephContext):
-
-    def __call__(self):
-        ctxt = super(NovaComputeCephContext, self).__call__()
-        if not ctxt:
-            return {}
-        svc = service_name()
-        # secret.xml
-        ctxt['ceph_secret_uuid'] = CEPH_SECRET_UUID
-        # nova.conf
-        ctxt['service_name'] = svc
-        ctxt['rbd_user'] = svc
-        ctxt['rbd_secret_uuid'] = CEPH_SECRET_UUID
-        ctxt['rbd_pool'] = 'nova'
-
-        return ctxt
 
 
 class CloudComputeContext(context.OSContextGenerator):
 
     '''
     Generates main context for writing nova.conf and quantum.conf templates
-    from a cloud-compute relation changed hook.  Mainly used for determinig
+    from a cloud-compute relation changed hook.  Mainly used for determining
     correct network and volume service configuration on the compute node,
     as advertised by the cloud-controller.
 
-    Note: individual quantum plugin contexts are handled elsewhere.
+    Note: individual neutroj plugin contexts are handled elsewhere.
     '''
     interfaces = ['cloud-compute']
-
-    def _ensure_packages(self, packages):
-        '''Install but do not upgrade required packages'''
-        required = filter_installed_packages(packages)
-        if required:
-            apt_install(required, fatal=True)
 
     @property
     def network_manager(self):
@@ -155,29 +74,13 @@ class CloudComputeContext(context.OSContextGenerator):
 
     @property
     def volume_service(self):
-        volume_service = None
         for rid in relation_ids('cloud-compute'):
             for unit in related_units(rid):
                 volume_service = relation_get('volume_service',
                                               rid=rid, unit=unit)
-        return volume_service
-
-    def flat_dhcp_context(self):
-        ec2_host = None
-        for rid in relation_ids('cloud-compute'):
-            for unit in related_units(rid):
-                ec2_host = relation_get('ec2_host', rid=rid, unit=unit)
-
-        if not ec2_host:
-            return {}
-
-        if config('multi-host').lower() == 'yes':
-            self._ensure_packages(['nova-api', 'nova-network'])
-
-        return {
-            'flat_interface': config('flat-interface'),
-            'ec2_dmz_host': ec2_host,
-        }
+                if volume_service:
+                    return volume_service
+        return None
 
     def neutron_context(self):
         # generate config context for neutron or quantum. these get converted
@@ -244,27 +147,12 @@ class CloudComputeContext(context.OSContextGenerator):
         # provide basic validation that the volume manager is supported on the
         # given openstack release (nova-volume is only supported for E and F)
         # it is up to release templates to set the correct volume driver.
-
         if not self.volume_service:
             return {}
 
-        os_rel = 'icehouse'
-
         # ensure volume service is supported on specific openstack release.
         if self.volume_service == 'cinder':
-            if os_rel == 'essex':
-                e = ('Attempting to configure cinder volume manager on '
-                     'an unsupported OpenStack release (essex)')
-                log(e, level=ERROR)
-                raise context.OSContextError(e)
             return 'cinder'
-        elif self.volume_service == 'nova-volume':
-            if os_release('nova-common') not in ['essex', 'folsom']:
-                e = ('Attempting to configure nova-volume manager on '
-                     'an unsupported OpenStack release (%s).' % os_rel)
-                log(e, level=ERROR)
-                raise context.OSContextError(e)
-            return 'nova-volume'
         else:
             e = ('Invalid volume service received via cloud-compute: %s' %
                  self.volume_service)
@@ -273,24 +161,25 @@ class CloudComputeContext(context.OSContextGenerator):
 
     def network_manager_context(self):
         ctxt = {}
-        if self.network_manager == 'flatdhcpmanager':
-            ctxt = self.flat_dhcp_context()
-        elif self.network_manager in ['neutron', 'quantum']:
+        if self.network_manager in ['neutron', 'quantum']:
             ctxt = self.neutron_context()
-
-        _save_flag_file(path='/etc/nova/nm.conf', data=self.network_manager)
+        else:
+            e = ('Invalid network manager received via cloud-compute: %s' %
+                 self.network_manager)
+            log(e, level=ERROR)
+            raise context.OSContextError(e)
 
         log('Generated config context for %s network manager.' %
             self.network_manager)
         return ctxt
 
     def restart_trigger(self):
-        rt = None
         for rid in relation_ids('cloud-compute'):
             for unit in related_units(rid):
                 rt = relation_get('restart_trigger', rid=rid, unit=unit)
                 if rt:
                     return rt
+        return None
 
     def __call__(self):
         rids = relation_ids('cloud-compute')
@@ -329,10 +218,9 @@ class NeutronComputeContext(context.NeutronContext):
     def neutron_security_groups(self):
         return _neutron_security_groups()
 
-    def _ensure_bridge(self):
-        if not service_running('openvswitch-switch'):
-            service_start('openvswitch-switch')
-        add_bridge(OVS_BRIDGE)
+    def _ensure_packages(self):
+        # NOTE(jamespage) no-op for nova-compute-power
+        pass
 
     def ovs_ctxt(self):
         # In addition to generating config context, ensure the OVS service
@@ -342,7 +230,6 @@ class NeutronComputeContext(context.NeutronContext):
         if not ovs_ctxt:
             return {}
 
-        self._ensure_bridge()
-
+        # TODO(jamespage) needs to be remote IP - so this won't work always
         ovs_ctxt['local_ip'] = get_host_ip(unit_get('private-address'))
         return ovs_ctxt

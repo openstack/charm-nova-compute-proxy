@@ -4,6 +4,5 @@
 <pydev_property name="org.python.pydev.PYTHON_PROJECT_INTERPRETER">Default</pydev_property>
 <pydev_pathproperty name="org.python.pydev.PROJECT_SOURCE_PATH">
 <path>/nova-compute-power/hooks</path>
-<path>/nova-compute-power/unit_tests</path>
 </pydev_pathproperty>
 </pydev_project>

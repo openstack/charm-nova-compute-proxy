@@ -5,12 +5,9 @@ import sys
 from charmhelpers.core.hookenv import (
     Hooks,
     config,
-    is_relation_made,
     log,
-    ERROR,
     relation_ids,
     relation_set,
-    unit_get,
     UnregisteredHookError,
 )
 
@@ -73,53 +70,6 @@ def amqp_changed():
     proxy.commit()
 
 
-@hooks.hook('shared-db-relation-joined')
-def db_joined(rid=None):
-    if is_relation_made('pgsql-db'):
-        # error, postgresql is used
-        e = ('Attempting to associate a mysql database when there is already '
-             'associated a postgresql one')
-        log(e, level=ERROR)
-        raise Exception(e)
-
-    relation_set(relation_id=rid,
-                 nova_database=config('database'),
-                 nova_username=config('database-user'),
-                 nova_hostname=unit_get('private-address'))
-
-
-@hooks.hook('pgsql-db-relation-joined')
-def pgsql_db_joined():
-    if is_relation_made('shared-db'):
-        # raise error
-        e = ('Attempting to associate a postgresql database when'
-             ' there is already associated a mysql one')
-        log(e, level=ERROR)
-        raise Exception(e)
-
-    relation_set(database=config('database'))
-
-
-@hooks.hook('shared-db-relation-changed')
-@restart_on_change(restart_map(), proxy.restart_service)
-def db_changed():
-    if 'shared-db' not in CONFIGS.complete_contexts():
-        log('shared-db relation incomplete. Peer not ready?')
-        return
-    CONFIGS.write(NOVA_CONF)
-    proxy.commit()
-
-
-@hooks.hook('pgsql-db-relation-changed')
-@restart_on_change(restart_map(), proxy.restart_service)
-def postgresql_db_changed():
-    if 'pgsql-db' not in CONFIGS.complete_contexts():
-        log('pgsql-db relation incomplete. Peer not ready?')
-        return
-    CONFIGS.write(NOVA_CONF)
-    proxy.commit()
-
-
 @hooks.hook('image-service-relation-changed')
 @restart_on_change(restart_map(), proxy.restart_service)
 def image_service_changed():
@@ -143,9 +93,7 @@ def compute_changed():
 
 
 @hooks.hook('amqp-relation-broken',
-            'image-service-relation-broken',
-            'shared-db-relation-broken',
-            'pgsql-db-relation-broken')
+            'image-service-relation-broken')
 @restart_on_change(restart_map(), proxy.restart_service)
 def relation_broken():
     CONFIGS.write_all()

@@ -20,7 +20,8 @@ from fabfile import (
     restart_service,
     enable_shell,
     disable_shell,
-    fix_path_ownership
+    fix_path_ownership,
+    fix_ml2_plugin_config
 )
 
 try:
@@ -42,7 +43,6 @@ TEMPLATE_DIR = 'templates'
 PACKAGES = ['openstack-nova-compute',
             'openstack-neutron',
             'openstack-neutron-openvswitch',
-            'openstack-neutron-linuxbridge',
             'python-neutronclient',
             'ceilometer-compute-agent']
 
@@ -86,6 +86,7 @@ class POWERProxy():
     def install(self):
         self._setup_yum()
         self._install_packages()
+        self._fix_ml2_plugin_config()
 
     def _setup_yum(self):
         log('Setup yum')
@@ -99,6 +100,9 @@ class POWERProxy():
 
     def _install_packages(self):
         execute(yum_install, PACKAGES)
+
+    def _fix_ml2_plugin_config(self):
+        execute(fix_ml2_plugin_config)
 
     def configure(self):
         self.add_bridge()
