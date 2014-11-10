@@ -15,6 +15,7 @@ from charmhelpers.fetch import (
 )
 from fabfile import (
     add_bridge,
+    add_bridge_port,
     copy_file_as_root,
     yum_install,
     restart_service,
