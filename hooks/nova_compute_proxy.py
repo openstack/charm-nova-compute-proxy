@@ -56,10 +56,10 @@ CONFIG_FILES = [
 
 class POWERProxy():
 
-    def __init__(self, user, ssh_key, hosts,
+    def __init__(self, user, hosts,
                  repository, password):
-        if None in [user, ssh_key, hosts, repository]:
-            raise Exception('Missing configuration')
+        if None in [user, hosts, repository]:
+            raise ValueError('Missing configuration')
         self.user = user
         self.hosts = hosts.split()
         self.repository = repository
