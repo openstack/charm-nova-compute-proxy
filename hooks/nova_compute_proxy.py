@@ -5,6 +5,7 @@ from collections import OrderedDict
 from charmhelpers.core.hookenv import (
     charm_dir,
     log,
+    config,
 )
 from charmhelpers.core.host import (
     file_hash
@@ -113,6 +114,10 @@ class POWERProxy():
     def add_bridges(self):
         execute(add_bridge, 'br-int')
         execute(add_bridge, 'br-data')
+        if config('data-port'):
+            execute(add_bridge_port, 'br-data',
+                    config('data-port'))
+
 
     def enable_shell(self, user):
         execute(enable_shell, user)

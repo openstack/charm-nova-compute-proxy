@@ -1,12 +1,10 @@
 from charmhelpers.contrib.openstack import context
-from charmhelpers.contrib.openstack.utils import get_host_ip
 from charmhelpers.core.hookenv import (
     config,
     log,
     relation_get,
     relation_ids,
     related_units,
-    unit_get,
     ERROR,
 )
 
