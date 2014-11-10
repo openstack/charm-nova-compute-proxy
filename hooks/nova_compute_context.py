@@ -163,11 +163,6 @@ class CloudComputeContext(context.OSContextGenerator):
         ctxt = {}
         if self.network_manager in ['neutron', 'quantum']:
             ctxt = self.neutron_context()
-        else:
-            e = ('Invalid network manager received via cloud-compute: %s' %
-                 self.network_manager)
-            log(e, level=ERROR)
-            raise context.OSContextError(e)
 
         log('Generated config context for %s network manager.' %
             self.network_manager)
