@@ -102,6 +102,7 @@ class POWERProxy():
         self.add_bridges()
 
     def copy_file(self, target):
+        print(os.path.join(CHARM_SCRATCH_DIR, target))
         execute(copy_file_as_root,
                 os.path.join(CHARM_SCRATCH_DIR, target),
                 target)
