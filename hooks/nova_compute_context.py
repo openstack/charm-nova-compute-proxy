@@ -241,6 +241,10 @@ class NeutronPowerComputeContext(context.NeutronContext):
         # NOTE(jamespage) no-op for nova-compute-power
         pass
 
+    def _save_flag_file(self):
+        # NOTE(jamespage) no-op for nova-compute-power
+        pass
+
     def ovs_ctxt(self):
         ovs_ctxt = {
             'core_plugin': 'neutron.plugins.ml2.plugin.Ml2Plugin',
