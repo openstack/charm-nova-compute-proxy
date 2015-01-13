@@ -56,6 +56,11 @@ def fix_path_ownership(path, user='nova'):
     sudo('chown {} {}'.format(user, path))
 
 
+def fix_selinux_permission(path):
+    sudo('chcon -vv --user=system_u --role=object_r --type=etc_t --range=s0 '
+         '{}'.format(path))
+
+
 def fix_ml2_plugin_config():
     sudo('sed -i "s!openvswitch/ovs_neutron_plugin.ini'
          '!ml2/ml2_conf.ini!g" /etc/init.d/neutron-openvswitch-agent')
