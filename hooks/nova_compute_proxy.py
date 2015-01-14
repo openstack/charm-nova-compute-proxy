@@ -22,6 +22,7 @@ from fabfile import (
     enable_shell,
     disable_shell,
     fix_path_ownership,
+    fix_selinux_permission,
     fix_ml2_plugin_config,
     fix_local_ip
 )
@@ -129,10 +130,14 @@ class POWERProxy():
     def fix_path_ownership(self, user, path):
         execute(fix_path_ownership, user, path)
 
+    def fix_selinux_permission(self, path):
+        execute(fix_selinux_permission, path)
+
     def commit(self):
         for f in CONFIG_FILES:
             if os.path.exists("%s%s" % (CHARM_SCRATCH_DIR, f)):
                 self.copy_file(f)
+                self.fix_selinux_permission(f)
         self._fixup_local_ips()
 
     def _fixup_local_ips(self):
