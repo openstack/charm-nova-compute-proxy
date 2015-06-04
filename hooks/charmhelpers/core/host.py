@@ -1,3 +1,19 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
 """Tools for working with the host system"""
 # Copyright 2012 Canonical Ltd.
 #
@@ -14,11 +30,12 @@ import string
 import subprocess
 import hashlib
 from contextlib import contextmanager
-
 from collections import OrderedDict
 
-from hookenv import log
-from fstab import Fstab
+import six
+
+from .hookenv import log
+from .fstab import Fstab
 
 
 def service_start(service_name):
@@ -54,7 +71,9 @@ def service(action, service_name):
 def service_running(service):
     """Determine whether a system service is running"""
     try:
-        output = subprocess.check_output(['service', service, 'status'], stderr=subprocess.STDOUT)
+        output = subprocess.check_output(
+            ['service', service, 'status'],
+            stderr=subprocess.STDOUT).decode('UTF-8')
     except subprocess.CalledProcessError:
         return False
     else:
@@ -67,9 +86,11 @@ def service_running(service):
 def service_available(service_name):
     """Determine whether a system service is available"""
     try:
-        subprocess.check_output(['service', service_name, 'status'], stderr=subprocess.STDOUT)
+        subprocess.check_output(
+            ['service', service_name, 'status'],
+            stderr=subprocess.STDOUT).decode('UTF-8')
     except subprocess.CalledProcessError as e:
-        return 'unrecognized service' not in e.output
+        return b'unrecognized service' not in e.output
     else:
         return True
 
@@ -96,6 +117,26 @@ def adduser(username, password=None, shell='/bin/bash', system_user=False):
     return user_info
 
 
+def add_group(group_name, system_group=False):
+    """Add a group to the system"""
+    try:
+        group_info = grp.getgrnam(group_name)
+        log('group {0} already exists!'.format(group_name))
+    except KeyError:
+        log('creating group {0}'.format(group_name))
+        cmd = ['addgroup']
+        if system_group:
+            cmd.append('--system')
+        else:
+            cmd.extend([
+                '--group',
+            ])
+        cmd.append(group_name)
+        subprocess.check_call(cmd)
+        group_info = grp.getgrnam(group_name)
+    return group_info
+
+
 def add_user_to_group(username, group):
     """Add a user to a group"""
     cmd = [
@@ -115,7 +156,7 @@ def rsync(from_path, to_path, flags='-r', options=None):
     cmd.append(from_path)
     cmd.append(to_path)
     log(" ".join(cmd))
-    return subprocess.check_output(cmd).strip()
+    return subprocess.check_output(cmd).decode('UTF-8').strip()
 
 
 def symlink(source, destination):
@@ -130,28 +171,31 @@ def symlink(source, destination):
     subprocess.check_call(cmd)
 
 
-def mkdir(path, owner='root', group='root', perms=0555, force=False):
+def mkdir(path, owner='root', group='root', perms=0o555, force=False):
     """Create a directory"""
     log("Making dir {} {}:{} {:o}".format(path, owner, group,
                                           perms))
     uid = pwd.getpwnam(owner).pw_uid
     gid = grp.getgrnam(group).gr_gid
     realpath = os.path.abspath(path)
-    if os.path.exists(realpath):
-        if force and not os.path.isdir(realpath):
+    path_exists = os.path.exists(realpath)
+    if path_exists and force:
+        if not os.path.isdir(realpath):
             log("Removing non-directory file {} prior to mkdir()".format(path))
             os.unlink(realpath)
-    else:
+            os.makedirs(realpath, perms)
+    elif not path_exists:
         os.makedirs(realpath, perms)
     os.chown(realpath, uid, gid)
+    os.chmod(realpath, perms)
 
 
-def write_file(path, content, owner='root', group='root', perms=0444):
-    """Create or overwrite a file with the contents of a string"""
+def write_file(path, content, owner='root', group='root', perms=0o444):
+    """Create or overwrite a file with the contents of a byte string."""
     log("Writing file {} {}:{} {:o}".format(path, owner, group, perms))
     uid = pwd.getpwnam(owner).pw_uid
     gid = grp.getgrnam(group).gr_gid
-    with open(path, 'w') as target:
+    with open(path, 'wb') as target:
         os.fchown(target.fileno(), uid, gid)
         os.fchmod(target.fileno(), perms)
         target.write(content)
@@ -177,7 +221,7 @@ def mount(device, mountpoint, options=None, persist=False, filesystem="ext3"):
     cmd_args.extend([device, mountpoint])
     try:
         subprocess.check_output(cmd_args)
-    except subprocess.CalledProcessError, e:
+    except subprocess.CalledProcessError as e:
         log('Error mounting {} at {}\n{}'.format(device, mountpoint, e.output))
         return False
 
@@ -191,7 +235,7 @@ def umount(mountpoint, persist=False):
     cmd_args = ['umount', mountpoint]
     try:
         subprocess.check_output(cmd_args)
-    except subprocess.CalledProcessError, e:
+    except subprocess.CalledProcessError as e:
         log('Error unmounting {}\n{}'.format(mountpoint, e.output))
         return False
 
@@ -218,8 +262,8 @@ def file_hash(path, hash_type='md5'):
     """
     if os.path.exists(path):
         h = getattr(hashlib, hash_type)()
-        with open(path, 'r') as source:
-            h.update(source.read())  # IGNORE:E1101 - it does have update
+        with open(path, 'rb') as source:
+            h.update(source.read())
         return h.hexdigest()
     else:
         return None
@@ -261,11 +305,11 @@ def restart_on_change(restart_map, stopstart=False):
     ceph_client_changed function.
     """
     def wrap(f):
-        def wrapped_f(*args):
+        def wrapped_f(*args, **kwargs):
             checksums = {}
             for path in restart_map:
                 checksums[path] = file_hash(path)
-            f(*args)
+            f(*args, **kwargs)
             restarts = []
             for path in restart_map:
                 if checksums[path] != file_hash(path):
@@ -295,29 +339,33 @@ def lsb_release():
 def pwgen(length=None):
     """Generate a random pasword."""
     if length is None:
+        # A random length is ok to use a weak PRNG
         length = random.choice(range(35, 45))
     alphanumeric_chars = [
-        l for l in (string.letters + string.digits)
+        l for l in (string.ascii_letters + string.digits)
         if l not in 'l0QD1vAEIOUaeiou']
+    # Use a crypto-friendly PRNG (e.g. /dev/urandom) for making the
+    # actual password
+    random_generator = random.SystemRandom()
     random_chars = [
-        random.choice(alphanumeric_chars) for _ in range(length)]
+        random_generator.choice(alphanumeric_chars) for _ in range(length)]
     return(''.join(random_chars))
 
 
 def list_nics(nic_type):
     '''Return a list of nics of given type(s)'''
-    if isinstance(nic_type, basestring):
+    if isinstance(nic_type, six.string_types):
         int_types = [nic_type]
     else:
         int_types = nic_type
     interfaces = []
     for int_type in int_types:
         cmd = ['ip', 'addr', 'show', 'label', int_type + '*']
-        ip_output = subprocess.check_output(cmd).split('\n')
+        ip_output = subprocess.check_output(cmd).decode('UTF-8').split('\n')
         ip_output = (line for line in ip_output if line)
         for line in ip_output:
             if line.split()[1].startswith(int_type):
-                matched = re.search('.*: (bond[0-9]+\.[0-9]+)@.*', line)
+                matched = re.search('.*: (' + int_type + r'[0-9]+\.[0-9]+)@.*', line)
                 if matched:
                     interface = matched.groups()[0]
                 else:
@@ -335,7 +383,7 @@ def set_nic_mtu(nic, mtu):
 
 def get_nic_mtu(nic):
     cmd = ['ip', 'addr', 'show', nic]
-    ip_output = subprocess.check_output(cmd).split('\n')
+    ip_output = subprocess.check_output(cmd).decode('UTF-8').split('\n')
     mtu = ""
     for line in ip_output:
         words = line.split()
@@ -346,7 +394,7 @@ def get_nic_mtu(nic):
 
 def get_nic_hwaddr(nic):
     cmd = ['ip', '-o', '-0', 'addr', 'show', nic]
-    ip_output = subprocess.check_output(cmd)
+    ip_output = subprocess.check_output(cmd).decode('UTF-8')
     hwaddr = ""
     words = ip_output.split()
     if 'link/ether' in words:
@@ -361,10 +409,13 @@ def cmp_pkgrevno(package, revno, pkgcache=None):
     *  0 => Installed revno is the same as supplied arg
     * -1 => Installed revno is less than supplied arg
 
+    This function imports apt_cache function from charmhelpers.fetch if
+    the pkgcache argument is None. Be sure to add charmhelpers.fetch if
+    you call this function, or pass an apt_pkg.Cache() instance.
     '''
     import apt_pkg
-    from charmhelpers.fetch import apt_cache
     if not pkgcache:
+        from charmhelpers.fetch import apt_cache
         pkgcache = apt_cache()
     pkg = pkgcache[package]
     return apt_pkg.version_compare(pkg.current_ver.ver_str, revno)
@@ -379,13 +430,21 @@ def chdir(d):
         os.chdir(cur)
 
 
-def chownr(path, owner, group):
+def chownr(path, owner, group, follow_links=True):
     uid = pwd.getpwnam(owner).pw_uid
     gid = grp.getgrnam(group).gr_gid
+    if follow_links:
+        chown = os.chown
+    else:
+        chown = os.lchown
 
     for root, dirs, files in os.walk(path):
         for name in dirs + files:
             full = os.path.join(root, name)
             broken_symlink = os.path.lexists(full) and not os.path.exists(full)
             if not broken_symlink:
-                os.chown(full, uid, gid)
+                chown(full, uid, gid)
+
+
+def lchownr(path, owner, group):
+    chownr(path, owner, group, follow_links=False)

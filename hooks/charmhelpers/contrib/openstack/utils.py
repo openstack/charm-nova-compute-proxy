@@ -1,5 +1,21 @@
 #!/usr/bin/python
 
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
 # Common python helper functions used for OpenStack charms.
 from collections import OrderedDict
 from functools import wraps
@@ -7,14 +23,21 @@ from functools import wraps
 import subprocess
 import json
 import os
-import socket
 import sys
+
+import six
+import yaml
+
+from charmhelpers.contrib.network import ip
+
+from charmhelpers.core import (
+    unitdata,
+)
 
 from charmhelpers.core.hookenv import (
     config,
     log as juju_log,
     charm_dir,
-    ERROR,
     INFO,
     relation_ids,
     relation_set
@@ -30,8 +53,13 @@ from charmhelpers.contrib.network.ip import (
     get_ipv6_addr
 )
 
+from charmhelpers.contrib.python.packages import (
+    pip_create_virtualenv,
+    pip_install,
+)
+
 from charmhelpers.core.host import lsb_release, mounts, umount
-from charmhelpers.fetch import apt_install, apt_cache
+from charmhelpers.fetch import apt_install, apt_cache, install_remote
 from charmhelpers.contrib.storage.linux.utils import is_block_device, zap_disk
 from charmhelpers.contrib.storage.linux.loopback import ensure_loopback_device
 
@@ -50,6 +78,7 @@ UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('saucy', 'havana'),
     ('trusty', 'icehouse'),
     ('utopic', 'juno'),
+    ('vivid', 'kilo'),
 ])
 
 
@@ -61,6 +90,7 @@ OPENSTACK_CODENAMES = OrderedDict([
     ('2013.2', 'havana'),
     ('2014.1', 'icehouse'),
     ('2014.2', 'juno'),
+    ('2015.1', 'kilo'),
 ])
 
 # The ugly duckling
@@ -81,6 +111,8 @@ SWIFT_CODENAMES = OrderedDict([
     ('2.0.0', 'juno'),
     ('2.1.0', 'juno'),
     ('2.2.0', 'juno'),
+    ('2.2.1', 'kilo'),
+    ('2.2.2', 'kilo'),
 ])
 
 DEFAULT_LOOPBACK_SIZE = '5G'
@@ -113,7 +145,7 @@ def get_os_codename_install_source(src):
 
     # Best guess match based on deb string provided
     if src.startswith('deb') or src.startswith('ppa'):
-        for k, v in OPENSTACK_CODENAMES.iteritems():
+        for k, v in six.iteritems(OPENSTACK_CODENAMES):
             if v in src:
                 return v
 
@@ -134,7 +166,7 @@ def get_os_codename_version(vers):
 
 def get_os_version_codename(codename):
     '''Determine OpenStack version number from codename.'''
-    for k, v in OPENSTACK_CODENAMES.iteritems():
+    for k, v in six.iteritems(OPENSTACK_CODENAMES):
         if v == codename:
             return k
     e = 'Could not derive OpenStack version for '\
@@ -194,7 +226,7 @@ def get_os_version_package(pkg, fatal=True):
     else:
         vers_map = OPENSTACK_CODENAMES
 
-    for version, cname in vers_map.iteritems():
+    for version, cname in six.iteritems(vers_map):
         if cname == codename:
             return version
     # e = "Could not determine OpenStack version for package: %s" % pkg
@@ -286,6 +318,9 @@ def configure_installation_source(rel):
             'juno': 'trusty-updates/juno',
             'juno/updates': 'trusty-updates/juno',
             'juno/proposed': 'trusty-proposed/juno',
+            'kilo': 'trusty-updates/kilo',
+            'kilo/updates': 'trusty-updates/kilo',
+            'kilo/proposed': 'trusty-proposed/kilo',
         }
 
         try:
@@ -303,6 +338,21 @@ def configure_installation_source(rel):
         error_out("Invalid openstack-release specified: %s" % rel)
 
 
+def config_value_changed(option):
+    """
+    Determine if config value changed since last call to this function.
+    """
+    hook_data = unitdata.HookData()
+    with hook_data():
+        db = unitdata.kv()
+        current = config(option)
+        saved = db.get(option)
+        db.set(option, current)
+        if saved is None:
+            return False
+        return current != saved
+
+
 def save_script_rc(script_path="scripts/scriptrc", **env_vars):
     """
     Write an rc file in the charm-delivered directory containing
@@ -318,7 +368,7 @@ def save_script_rc(script_path="scripts/scriptrc", **env_vars):
         rc_script.write(
             "#!/bin/bash\n")
         [rc_script.write('export %s=%s\n' % (u, p))
-         for u, p in env_vars.iteritems() if u != "script_path"]
+         for u, p in six.iteritems(env_vars) if u != "script_path"]
 
 
 def openstack_upgrade_available(package):
@@ -351,8 +401,8 @@ def ensure_block_device(block_device):
     '''
     _none = ['None', 'none', None]
     if (block_device in _none):
-        error_out('prepare_storage(): Missing required input: '
-                  'block_device=%s.' % block_device, level=ERROR)
+        error_out('prepare_storage(): Missing required input: block_device=%s.'
+                  % block_device)
 
     if block_device.startswith('/dev/'):
         bdev = block_device
@@ -368,8 +418,7 @@ def ensure_block_device(block_device):
         bdev = '/dev/%s' % block_device
 
     if not is_block_device(bdev):
-        error_out('Failed to locate valid block device at %s' % bdev,
-                  level=ERROR)
+        error_out('Failed to locate valid block device at %s' % bdev)
 
     return bdev
 
@@ -396,77 +445,10 @@ def clean_storage(block_device):
     else:
         zap_disk(block_device)
 
-
-def is_ip(address):
-    """
-    Returns True if address is a valid IP address.
-    """
-    try:
-        # Test to see if already an IPv4 address
-        socket.inet_aton(address)
-        return True
-    except socket.error:
-        return False
-
-
-def ns_query(address):
-    try:
-        import dns.resolver
-    except ImportError:
-        apt_install('python-dnspython')
-        import dns.resolver
-
-    if isinstance(address, dns.name.Name):
-        rtype = 'PTR'
-    elif isinstance(address, basestring):
-        rtype = 'A'
-    else:
-        return None
-
-    answers = dns.resolver.query(address, rtype)
-    if answers:
-        return str(answers[0])
-    return None
-
-
-def get_host_ip(hostname):
-    """
-    Resolves the IP for a given hostname, or returns
-    the input if it is already an IP.
-    """
-    if is_ip(hostname):
-        return hostname
-
-    return ns_query(hostname)
-
-
-def get_hostname(address, fqdn=True):
-    """
-    Resolves hostname for given IP, or returns the input
-    if it is already a hostname.
-    """
-    if is_ip(address):
-        try:
-            import dns.reversename
-        except ImportError:
-            apt_install('python-dnspython')
-            import dns.reversename
-
-        rev = dns.reversename.from_address(address)
-        result = ns_query(rev)
-        if not result:
-            return None
-    else:
-        result = address
-
-    if fqdn:
-        # strip trailing .
-        if result.endswith('.'):
-            return result[:-1]
-        else:
-            return result
-    else:
-        return result.split('.')[0]
+is_ip = ip.is_ip
+ns_query = ip.ns_query
+get_host_ip = ip.get_host_ip
+get_hostname = ip.get_hostname
 
 
 def get_matchmaker_map(mm_file='/etc/oslo/matchmaker_ring.json'):
@@ -486,8 +468,7 @@ def sync_db_with_multi_ipv6_addresses(database, database_user,
               'hostname': json.dumps(hosts)}
 
     if relation_prefix:
-        keys = kwargs.keys()
-        for key in keys:
+        for key in list(kwargs.keys()):
             kwargs["%s_%s" % (relation_prefix, key)] = kwargs[key]
             del kwargs[key]
 
@@ -508,3 +489,201 @@ def os_requires_version(ostack_release, pkg):
             f(*args)
         return wrapped_f
     return wrap
+
+
+def git_install_requested():
+    """
+    Returns true if openstack-origin-git is specified.
+    """
+    return config('openstack-origin-git') is not None
+
+
+requirements_dir = None
+
+
+def _git_yaml_load(projects_yaml):
+    """
+    Load the specified yaml into a dictionary.
+    """
+    if not projects_yaml:
+        return None
+
+    return yaml.load(projects_yaml)
+
+
+def git_clone_and_install(projects_yaml, core_project, depth=1):
+    """
+    Clone/install all specified OpenStack repositories.
+
+    The expected format of projects_yaml is:
+        repositories:
+          - {name: keystone,
+             repository: 'git://git.openstack.org/openstack/keystone.git',
+             branch: 'stable/icehouse'}
+          - {name: requirements,
+             repository: 'git://git.openstack.org/openstack/requirements.git',
+             branch: 'stable/icehouse'}
+        directory: /mnt/openstack-git
+        http_proxy: squid-proxy-url
+        https_proxy: squid-proxy-url
+
+        The directory, http_proxy, and https_proxy keys are optional.
+    """
+    global requirements_dir
+    parent_dir = '/mnt/openstack-git'
+    http_proxy = None
+
+    projects = _git_yaml_load(projects_yaml)
+    _git_validate_projects_yaml(projects, core_project)
+
+    old_environ = dict(os.environ)
+
+    if 'http_proxy' in projects.keys():
+        http_proxy = projects['http_proxy']
+        os.environ['http_proxy'] = projects['http_proxy']
+    if 'https_proxy' in projects.keys():
+        os.environ['https_proxy'] = projects['https_proxy']
+
+    if 'directory' in projects.keys():
+        parent_dir = projects['directory']
+
+    pip_create_virtualenv(os.path.join(parent_dir, 'venv'))
+
+    for p in projects['repositories']:
+        repo = p['repository']
+        branch = p['branch']
+        if p['name'] == 'requirements':
+            repo_dir = _git_clone_and_install_single(repo, branch, depth,
+                                                     parent_dir, http_proxy,
+                                                     update_requirements=False)
+            requirements_dir = repo_dir
+        else:
+            repo_dir = _git_clone_and_install_single(repo, branch, depth,
+                                                     parent_dir, http_proxy,
+                                                     update_requirements=True)
+
+    os.environ = old_environ
+
+
+def _git_validate_projects_yaml(projects, core_project):
+    """
+    Validate the projects yaml.
+    """
+    _git_ensure_key_exists('repositories', projects)
+
+    for project in projects['repositories']:
+        _git_ensure_key_exists('name', project.keys())
+        _git_ensure_key_exists('repository', project.keys())
+        _git_ensure_key_exists('branch', project.keys())
+
+    if projects['repositories'][0]['name'] != 'requirements':
+        error_out('{} git repo must be specified first'.format('requirements'))
+
+    if projects['repositories'][-1]['name'] != core_project:
+        error_out('{} git repo must be specified last'.format(core_project))
+
+
+def _git_ensure_key_exists(key, keys):
+    """
+    Ensure that key exists in keys.
+    """
+    if key not in keys:
+        error_out('openstack-origin-git key \'{}\' is missing'.format(key))
+
+
+def _git_clone_and_install_single(repo, branch, depth, parent_dir, http_proxy,
+                                  update_requirements):
+    """
+    Clone and install a single git repository.
+    """
+    dest_dir = os.path.join(parent_dir, os.path.basename(repo))
+
+    if not os.path.exists(parent_dir):
+        juju_log('Directory already exists at {}. '
+                 'No need to create directory.'.format(parent_dir))
+        os.mkdir(parent_dir)
+
+    if not os.path.exists(dest_dir):
+        juju_log('Cloning git repo: {}, branch: {}'.format(repo, branch))
+        repo_dir = install_remote(repo, dest=parent_dir, branch=branch,
+                                  depth=depth)
+    else:
+        repo_dir = dest_dir
+
+    if update_requirements:
+        if not requirements_dir:
+            error_out('requirements repo must be cloned before '
+                      'updating from global requirements.')
+        _git_update_requirements(repo_dir, requirements_dir)
+
+    juju_log('Installing git repo from dir: {}'.format(repo_dir))
+    if http_proxy:
+        pip_install(repo_dir, proxy=http_proxy,
+                    venv=os.path.join(parent_dir, 'venv'))
+    else:
+        pip_install(repo_dir,
+                    venv=os.path.join(parent_dir, 'venv'))
+
+    return repo_dir
+
+
+def _git_update_requirements(package_dir, reqs_dir):
+    """
+    Update from global requirements.
+
+    Update an OpenStack git directory's requirements.txt and
+    test-requirements.txt from global-requirements.txt.
+    """
+    orig_dir = os.getcwd()
+    os.chdir(reqs_dir)
+    cmd = ['python', 'update.py', package_dir]
+    try:
+        subprocess.check_call(cmd)
+    except subprocess.CalledProcessError:
+        package = os.path.basename(package_dir)
+        error_out("Error updating {} from global-requirements.txt".format(package))
+    os.chdir(orig_dir)
+
+
+def git_pip_venv_dir(projects_yaml):
+    """
+    Return the pip virtualenv path.
+    """
+    parent_dir = '/mnt/openstack-git'
+
+    projects = _git_yaml_load(projects_yaml)
+
+    if 'directory' in projects.keys():
+        parent_dir = projects['directory']
+
+    return os.path.join(parent_dir, 'venv')
+
+
+def git_src_dir(projects_yaml, project):
+    """
+    Return the directory where the specified project's source is located.
+    """
+    parent_dir = '/mnt/openstack-git'
+
+    projects = _git_yaml_load(projects_yaml)
+
+    if 'directory' in projects.keys():
+        parent_dir = projects['directory']
+
+    for p in projects['repositories']:
+        if p['name'] == project:
+            return os.path.join(parent_dir, os.path.basename(p['repository']))
+
+    return None
+
+
+def git_yaml_value(projects_yaml, key):
+    """
+    Return the value in projects_yaml for the specified key.
+    """
+    projects = _git_yaml_load(projects_yaml)
+
+    if key in projects.keys():
+        return projects[key]
+
+    return None

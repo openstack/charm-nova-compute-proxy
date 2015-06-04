@@ -1,3 +1,19 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
 import logging
 import os
 import time
@@ -6,6 +22,8 @@ import urllib
 import glanceclient.v1.client as glance_client
 import keystoneclient.v2_0 as keystone_client
 import novaclient.v1_1.client as nova_client
+
+import six
 
 from charmhelpers.contrib.amulet.utils import (
     AmuletUtils
@@ -60,7 +78,7 @@ class OpenStackAmuletUtils(AmuletUtils):
            expected service catalog endpoints.
            """
         self.log.debug('actual: {}'.format(repr(actual)))
-        for k, v in expected.iteritems():
+        for k, v in six.iteritems(expected):
             if k in actual:
                 ret = self._validate_dict_data(expected[k][0], actual[k][0])
                 if ret:

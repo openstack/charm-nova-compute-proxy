@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 # Copyright 2014-2015 Canonical Limited.
 #
 # This file is part of charm-helpers.
@@ -14,5 +17,26 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
 
-from .base import *  # NOQA
-from .helpers import *  # NOQA
+import six
+
+
+def bool_from_string(value):
+    """Interpret string value as boolean.
+
+    Returns True if value translates to True otherwise False.
+    """
+    if isinstance(value, six.string_types):
+        value = six.text_type(value)
+    else:
+        msg = "Unable to interpret non-string value '%s' as boolean" % (value)
+        raise ValueError(msg)
+
+    value = value.strip().lower()
+
+    if value in ['y', 'yes', 'true', 't', 'on']:
+        return True
+    elif value in ['n', 'no', 'false', 'f', 'off']:
+        return False
+
+    msg = "Unable to interpret string value '%s' as boolean" % (value)
+    raise ValueError(msg)

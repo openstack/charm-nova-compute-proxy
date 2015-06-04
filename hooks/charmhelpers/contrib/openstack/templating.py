@@ -1,13 +1,29 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 
-from charmhelpers.fetch import apt_install
+import six
 
+from charmhelpers.fetch import apt_install
 from charmhelpers.core.hookenv import (
     log,
     ERROR,
     INFO
 )
-
 from charmhelpers.contrib.openstack.utils import OPENSTACK_CODENAMES
 
 try:
@@ -43,7 +59,7 @@ def get_loader(templates_dir, os_release):
         order by OpenStack release.
     """
     tmpl_dirs = [(rel, os.path.join(templates_dir, rel))
-                 for rel in OPENSTACK_CODENAMES.itervalues()]
+                 for rel in six.itervalues(OPENSTACK_CODENAMES)]
 
     if not os.path.isdir(templates_dir):
         log('Templates directory not found @ %s.' % templates_dir,
@@ -258,7 +274,7 @@ class OSConfigRenderer(object):
         """
         Write out all registered config files.
         """
-        [self.write(k) for k in self.templates.iterkeys()]
+        [self.write(k) for k in six.iterkeys(self.templates)]
 
     def set_release(self, openstack_release):
         """
@@ -275,5 +291,5 @@ class OSConfigRenderer(object):
         '''
         interfaces = []
         [interfaces.extend(i.complete_contexts())
-         for i in self.templates.itervalues()]
+         for i in six.itervalues(self.templates)]
         return interfaces
