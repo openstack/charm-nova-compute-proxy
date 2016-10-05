@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """
 This module contains helpers to add and remove ufw rules.
@@ -40,7 +38,9 @@ Examples:
 import re
 import os
 import subprocess
+
 from charmhelpers.core import hookenv
+from charmhelpers.core.kernel import modprobe, is_module_loaded
 
 __author__ = "Felipe Reyes <felipe.reyes@canonical.com>"
 
@@ -82,14 +82,11 @@ def is_ipv6_ok(soft_fail=False):
     # do we have IPv6 in the machine?
     if os.path.isdir('/proc/sys/net/ipv6'):
         # is ip6tables kernel module loaded?
-        lsmod = subprocess.check_output(['lsmod'], universal_newlines=True)
-        matches = re.findall('^ip6_tables[ ]+', lsmod, re.M)
-        if len(matches) == 0:
+        if not is_module_loaded('ip6_tables'):
             # ip6tables support isn't complete, let's try to load it
             try:
-                subprocess.check_output(['modprobe', 'ip6_tables'],
-                                        universal_newlines=True)
-                # great, we could load the module
+                modprobe('ip6_tables')
+                # great, we can load the module
                 return True
             except subprocess.CalledProcessError as ex:
                 hookenv.log("Couldn't load ip6_tables module: %s" % ex.output,
@@ -180,7 +177,43 @@ def disable():
         return True
 
 
-def modify_access(src, dst='any', port=None, proto=None, action='allow'):
+def default_policy(policy='deny', direction='incoming'):
+    """
+    Changes the default policy for traffic `direction`
+
+    :param policy: allow, deny or reject
+    :param direction: traffic direction, possible values: incoming, outgoing,
+                      routed
+    """
+    if policy not in ['allow', 'deny', 'reject']:
+        raise UFWError(('Unknown policy %s, valid values: '
+                        'allow, deny, reject') % policy)
+
+    if direction not in ['incoming', 'outgoing', 'routed']:
+        raise UFWError(('Unknown direction %s, valid values: '
+                        'incoming, outgoing, routed') % direction)
+
+    output = subprocess.check_output(['ufw', 'default', policy, direction],
+                                     universal_newlines=True,
+                                     env={'LANG': 'en_US',
+                                          'PATH': os.environ['PATH']})
+    hookenv.log(output, level='DEBUG')
+
+    m = re.findall("^Default %s policy changed to '%s'\n" % (direction,
+                                                             policy),
+                   output, re.M)
+    if len(m) == 0:
+        hookenv.log("ufw couldn't change the default policy to %s for %s"
+                    % (policy, direction), level='WARN')
+        return False
+    else:
+        hookenv.log("ufw default policy for %s changed to %s"
+                    % (direction, policy), level='INFO')
+        return True
+
+
+def modify_access(src, dst='any', port=None, proto=None, action='allow',
+                  index=None):
     """
     Grant access to an address or subnet
 
@@ -192,6 +225,8 @@ def modify_access(src, dst='any', port=None, proto=None, action='allow'):
     :param port: destiny port
     :param proto: protocol (tcp or udp)
     :param action: `allow` or `delete`
+    :param index: if different from None the rule is inserted at the given
+                  `index`.
     """
     if not is_enabled():
         hookenv.log('ufw is disabled, skipping modify_access()', level='WARN')
@@ -199,6 +234,8 @@ def modify_access(src, dst='any', port=None, proto=None, action='allow'):
 
     if action == 'delete':
         cmd = ['ufw', 'delete', 'allow']
+    elif index is not None:
+        cmd = ['ufw', 'insert', str(index), action]
     else:
         cmd = ['ufw', action]
 
@@ -227,7 +264,7 @@ def modify_access(src, dst='any', port=None, proto=None, action='allow'):
                     level='ERROR')
 
 
-def grant_access(src, dst='any', port=None, proto=None):
+def grant_access(src, dst='any', port=None, proto=None, index=None):
     """
     Grant access to an address or subnet
 
@@ -238,8 +275,11 @@ def grant_access(src, dst='any', port=None, proto=None):
                 field has to be set.
     :param port: destiny port
     :param proto: protocol (tcp or udp)
+    :param index: if different from None the rule is inserted at the given
+                  `index`.
     """
-    return modify_access(src, dst=dst, port=port, proto=proto, action='allow')
+    return modify_access(src, dst=dst, port=port, proto=proto, action='allow',
+                         index=index)
 
 
 def revoke_access(src, dst='any', port=None, proto=None):

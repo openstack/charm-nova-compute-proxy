@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import glob
 import re
@@ -23,7 +21,7 @@ import socket
 from functools import partial
 
 from charmhelpers.core.hookenv import unit_get
-from charmhelpers.fetch import apt_install
+from charmhelpers.fetch import apt_install, apt_update
 from charmhelpers.core.hookenv import (
     log,
     WARNING,
@@ -32,13 +30,15 @@ from charmhelpers.core.hookenv import (
 try:
     import netifaces
 except ImportError:
-    apt_install('python-netifaces')
+    apt_update(fatal=True)
+    apt_install('python-netifaces', fatal=True)
     import netifaces
 
 try:
     import netaddr
 except ImportError:
-    apt_install('python-netaddr')
+    apt_update(fatal=True)
+    apt_install('python-netaddr', fatal=True)
     import netaddr
 
 
@@ -51,7 +51,7 @@ def _validate_cidr(network):
 
 
 def no_ip_found_error_out(network):
-    errmsg = ("No IP address found in network: %s" % network)
+    errmsg = ("No IP address found in network(s): %s" % network)
     raise ValueError(errmsg)
 
 
@@ -59,7 +59,7 @@ def get_address_in_network(network, fallback=None, fatal=False):
     """Get an IPv4 or IPv6 address within the network from the host.
 
     :param network (str): CIDR presentation format. For example,
-        '192.168.1.0/24'.
+        '192.168.1.0/24'. Supports multiple networks as a space-delimited list.
     :param fallback (str): If no address is found, return fallback.
     :param fatal (boolean): If no address is found, fallback is not
         set and fatal is True then exit(1).
@@ -73,24 +73,26 @@ def get_address_in_network(network, fallback=None, fatal=False):
         else:
             return None
 
-    _validate_cidr(network)
-    network = netaddr.IPNetwork(network)
-    for iface in netifaces.interfaces():
-        addresses = netifaces.ifaddresses(iface)
-        if network.version == 4 and netifaces.AF_INET in addresses:
-            addr = addresses[netifaces.AF_INET][0]['addr']
-            netmask = addresses[netifaces.AF_INET][0]['netmask']
-            cidr = netaddr.IPNetwork("%s/%s" % (addr, netmask))
-            if cidr in network:
-                return str(cidr.ip)
+    networks = network.split() or [network]
+    for network in networks:
+        _validate_cidr(network)
+        network = netaddr.IPNetwork(network)
+        for iface in netifaces.interfaces():
+            addresses = netifaces.ifaddresses(iface)
+            if network.version == 4 and netifaces.AF_INET in addresses:
+                addr = addresses[netifaces.AF_INET][0]['addr']
+                netmask = addresses[netifaces.AF_INET][0]['netmask']
+                cidr = netaddr.IPNetwork("%s/%s" % (addr, netmask))
+                if cidr in network:
+                    return str(cidr.ip)
 
-        if network.version == 6 and netifaces.AF_INET6 in addresses:
-            for addr in addresses[netifaces.AF_INET6]:
-                if not addr['addr'].startswith('fe80'):
-                    cidr = netaddr.IPNetwork("%s/%s" % (addr['addr'],
-                                                        addr['netmask']))
-                    if cidr in network:
-                        return str(cidr.ip)
+            if network.version == 6 and netifaces.AF_INET6 in addresses:
+                for addr in addresses[netifaces.AF_INET6]:
+                    if not addr['addr'].startswith('fe80'):
+                        cidr = netaddr.IPNetwork("%s/%s" % (addr['addr'],
+                                                            addr['netmask']))
+                        if cidr in network:
+                            return str(cidr.ip)
 
     if fallback is not None:
         return fallback
@@ -187,6 +189,15 @@ get_iface_for_address = partial(_get_for_address, key='iface')
 get_netmask_for_address = partial(_get_for_address, key='netmask')
 
 
+def resolve_network_cidr(ip_address):
+    '''
+    Resolves the full address cidr of an ip_address based on
+    configured network interfaces
+    '''
+    netmask = get_netmask_for_address(ip_address)
+    return str(netaddr.IPNetwork("%s/%s" % (ip_address, netmask)).cidr)
+
+
 def format_ipv6_addr(address):
     """If address is IPv6, wrap it in '[]' otherwise return None.
 
@@ -201,7 +212,16 @@ def format_ipv6_addr(address):
 
 def get_iface_addr(iface='eth0', inet_type='AF_INET', inc_aliases=False,
                    fatal=True, exc_list=None):
-    """Return the assigned IP address for a given interface, if any."""
+    """Return the assigned IP address for a given interface, if any.
+
+    :param iface: network interface on which address(es) are expected to
+                  be found.
+    :param inet_type: inet address family
+    :param inc_aliases: include alias interfaces in search
+    :param fatal: if True, raise exception if address not found
+    :param exc_list: list of addresses to ignore
+    :return: list of ip addresses
+    """
     # Extract nic if passed /dev/ethX
     if '/' in iface:
         iface = iface.split('/')[-1]
@@ -302,6 +322,14 @@ def get_ipv6_addr(iface=None, inc_aliases=False, fatal=True, exc_list=None,
     We currently only support scope global IPv6 addresses i.e. non-temporary
     addresses. If no global IPv6 address is found, return the first one found
     in the ipv6 address list.
+
+    :param iface: network interface on which ipv6 address(es) are expected to
+                  be found.
+    :param inc_aliases: include alias interfaces in search
+    :param fatal: if True, raise exception if address not found
+    :param exc_list: list of addresses to ignore
+    :param dynamic_only: only recognise dynamic addresses
+    :return: list of ipv6 addresses
     """
     addresses = get_iface_addr(iface=iface, inet_type='AF_INET6',
                                inc_aliases=inc_aliases, fatal=fatal,
@@ -323,7 +351,7 @@ def get_ipv6_addr(iface=None, inc_aliases=False, fatal=True, exc_list=None,
             cmd = ['ip', 'addr', 'show', iface]
             out = subprocess.check_output(cmd).decode('UTF-8')
             if dynamic_only:
-                key = re.compile("inet6 (.+)/[0-9]+ scope global dynamic.*")
+                key = re.compile("inet6 (.+)/[0-9]+ scope global.* dynamic.*")
             else:
                 key = re.compile("inet6 (.+)/[0-9]+ scope global.*")
 
@@ -375,10 +403,10 @@ def is_ip(address):
     Returns True if address is a valid IP address.
     """
     try:
-        # Test to see if already an IPv4 address
-        socket.inet_aton(address)
+        # Test to see if already an IPv4/IPv6 address
+        address = netaddr.IPAddress(address)
         return True
-    except socket.error:
+    except (netaddr.AddrFormatError, ValueError):
         return False
 
 
@@ -386,7 +414,7 @@ def ns_query(address):
     try:
         import dns.resolver
     except ImportError:
-        apt_install('python-dnspython')
+        apt_install('python-dnspython', fatal=True)
         import dns.resolver
 
     if isinstance(address, dns.name.Name):
@@ -430,13 +458,17 @@ def get_hostname(address, fqdn=True):
         try:
             import dns.reversename
         except ImportError:
-            apt_install("python-dnspython")
+            apt_install("python-dnspython", fatal=True)
             import dns.reversename
 
         rev = dns.reversename.from_address(address)
         result = ns_query(rev)
+
         if not result:
-            return None
+            try:
+                result = socket.gethostbyaddr(address)[0]
+            except:
+                return None
     else:
         result = address
 
@@ -448,3 +480,18 @@ def get_hostname(address, fqdn=True):
             return result
     else:
         return result.split('.')[0]
+
+
+def port_has_listener(address, port):
+    """
+    Returns True if the address:port is open and being listened to,
+    else False.
+
+    @param address: an IP address or hostname
+    @param port: integer port
+
+    Note calls 'zc' via a subprocess shell
+    """
+    cmd = ['nc', '-z', address, str(port)]
+    result = subprocess.call(cmd)
+    return not(bool(result))

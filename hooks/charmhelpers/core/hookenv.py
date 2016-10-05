@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 "Interactions with the Juju environment"
 # Copyright 2013 Canonical Ltd.
@@ -21,7 +19,10 @@
 #  Charm Helpers Developers <juju@lists.ubuntu.com>
 
 from __future__ import print_function
+import copy
+from distutils.version import LooseVersion
 from functools import wraps
+import glob
 import os
 import json
 import yaml
@@ -71,6 +72,7 @@ def cached(func):
         res = func(*args, **kwargs)
         cache[key] = res
         return res
+    wrapper._wrapped = func
     return wrapper
 
 
@@ -170,9 +172,19 @@ def relation_type():
     return os.environ.get('JUJU_RELATION', None)
 
 
-def relation_id():
-    """The relation ID for the current relation hook"""
-    return os.environ.get('JUJU_RELATION_ID', None)
+@cached
+def relation_id(relation_name=None, service_or_unit=None):
+    """The relation ID for the current or a specified relation"""
+    if not relation_name and not service_or_unit:
+        return os.environ.get('JUJU_RELATION_ID', None)
+    elif relation_name and service_or_unit:
+        service_name = service_or_unit.split('/')[0]
+        for relid in relation_ids(relation_name):
+            remote_service = remote_service_name(relid)
+            if remote_service == service_name:
+                return relid
+    else:
+        raise ValueError('Must specify neither or both of relation_name and service_or_unit')
 
 
 def local_unit():
@@ -190,9 +202,20 @@ def service_name():
     return local_unit().split('/')[0]
 
 
+@cached
+def remote_service_name(relid=None):
+    """The remote service name for a given relation-id (or the current relation)"""
+    if relid is None:
+        unit = remote_unit()
+    else:
+        units = related_units(relid)
+        unit = units[0] if units else None
+    return unit.split('/')[0] if unit else None
+
+
 def hook_name():
     """The name of the currently executing hook"""
-    return os.path.basename(sys.argv[0])
+    return os.environ.get('JUJU_HOOK_NAME', os.path.basename(sys.argv[0]))
 
 
 class Config(dict):
@@ -242,29 +265,7 @@ class Config(dict):
         self.path = os.path.join(charm_dir(), Config.CONFIG_FILE_NAME)
         if os.path.exists(self.path):
             self.load_previous()
-
-    def __getitem__(self, key):
-        """For regular dict lookups, check the current juju config first,
-        then the previous (saved) copy. This ensures that user-saved values
-        will be returned by a dict lookup.
-
-        """
-        try:
-            return dict.__getitem__(self, key)
-        except KeyError:
-            return (self._prev_dict or {})[key]
-
-    def get(self, key, default=None):
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def keys(self):
-        prev_keys = []
-        if self._prev_dict is not None:
-            prev_keys = self._prev_dict.keys()
-        return list(set(prev_keys + list(dict.keys(self))))
+        atexit(self._implicit_save)
 
     def load_previous(self, path=None):
         """Load previous copy of config from disk.
@@ -283,6 +284,9 @@ class Config(dict):
         self.path = path or self.path
         with open(self.path) as f:
             self._prev_dict = json.load(f)
+        for k, v in copy.deepcopy(self._prev_dict).items():
+            if k not in self:
+                self[k] = v
 
     def changed(self, key):
         """Return True if the current value for this key is different from
@@ -314,12 +318,12 @@ class Config(dict):
         instance.
 
         """
-        if self._prev_dict:
-            for k, v in six.iteritems(self._prev_dict):
-                if k not in self:
-                    self[k] = v
         with open(self.path, 'w') as f:
             json.dump(self, f)
+
+    def _implicit_save(self):
+        if self.implicit_save:
+            self.save()
 
 
 @cached
@@ -485,6 +489,76 @@ def relation_types():
 
 
 @cached
+def peer_relation_id():
+    '''Get the peers relation id if a peers relation has been joined, else None.'''
+    md = metadata()
+    section = md.get('peers')
+    if section:
+        for key in section:
+            relids = relation_ids(key)
+            if relids:
+                return relids[0]
+    return None
+
+
+@cached
+def relation_to_interface(relation_name):
+    """
+    Given the name of a relation, return the interface that relation uses.
+
+    :returns: The interface name, or ``None``.
+    """
+    return relation_to_role_and_interface(relation_name)[1]
+
+
+@cached
+def relation_to_role_and_interface(relation_name):
+    """
+    Given the name of a relation, return the role and the name of the interface
+    that relation uses (where role is one of ``provides``, ``requires``, or ``peers``).
+
+    :returns: A tuple containing ``(role, interface)``, or ``(None, None)``.
+    """
+    _metadata = metadata()
+    for role in ('provides', 'requires', 'peers'):
+        interface = _metadata.get(role, {}).get(relation_name, {}).get('interface')
+        if interface:
+            return role, interface
+    return None, None
+
+
+@cached
+def role_and_interface_to_relations(role, interface_name):
+    """
+    Given a role and interface name, return a list of relation names for the
+    current charm that use that interface under that role (where role is one
+    of ``provides``, ``requires``, or ``peers``).
+
+    :returns: A list of relation names.
+    """
+    _metadata = metadata()
+    results = []
+    for relation_name, relation in _metadata.get(role, {}).items():
+        if relation['interface'] == interface_name:
+            results.append(relation_name)
+    return results
+
+
+@cached
+def interface_to_relations(interface_name):
+    """
+    Given an interface, return a list of relation names for the current
+    charm that use that interface.
+
+    :returns: A list of relation names.
+    """
+    results = []
+    for role in ('provides', 'requires', 'peers'):
+        results.extend(role_and_interface_to_relations(role, interface_name))
+    return results
+
+
+@cached
 def charm_name():
     """Get the name of the current charm as is specified on metadata.yaml"""
     return metadata().get('name')
@@ -560,6 +634,38 @@ def unit_private_ip():
     return unit_get('private-address')
 
 
+@cached
+def storage_get(attribute=None, storage_id=None):
+    """Get storage attributes"""
+    _args = ['storage-get', '--format=json']
+    if storage_id:
+        _args.extend(('-s', storage_id))
+    if attribute:
+        _args.append(attribute)
+    try:
+        return json.loads(subprocess.check_output(_args).decode('UTF-8'))
+    except ValueError:
+        return None
+
+
+@cached
+def storage_list(storage_name=None):
+    """List the storage IDs for the unit"""
+    _args = ['storage-list', '--format=json']
+    if storage_name:
+        _args.append(storage_name)
+    try:
+        return json.loads(subprocess.check_output(_args).decode('UTF-8'))
+    except ValueError:
+        return None
+    except OSError as e:
+        import errno
+        if e.errno == errno.ENOENT:
+            # storage-list does not exist
+            return []
+        raise
+
+
 class UnregisteredHookError(Exception):
     """Raised when an undefined hook is called"""
     pass
@@ -587,10 +693,14 @@ class Hooks(object):
             hooks.execute(sys.argv)
     """
 
-    def __init__(self, config_save=True):
+    def __init__(self, config_save=None):
         super(Hooks, self).__init__()
         self._hooks = {}
-        self._config_save = config_save
+
+        # For unknown reasons, we allow the Hooks constructor to override
+        # config().implicit_save.
+        if config_save is not None:
+            config().implicit_save = config_save
 
     def register(self, name, function):
         """Register a hook"""
@@ -598,13 +708,16 @@ class Hooks(object):
 
     def execute(self, args):
         """Execute a registered hook based on args[0]"""
+        _run_atstart()
         hook_name = os.path.basename(args[0])
         if hook_name in self._hooks:
-            self._hooks[hook_name]()
-            if self._config_save:
-                cfg = config()
-                if cfg.implicit_save:
-                    cfg.save()
+            try:
+                self._hooks[hook_name]()
+            except SystemExit as x:
+                if x.code is None or x.code == 0:
+                    _run_atexit()
+                raise
+            _run_atexit()
         else:
             raise UnregisteredHookError(hook_name)
 
@@ -653,6 +766,21 @@ def action_fail(message):
     subprocess.check_call(['action-fail', message])
 
 
+def action_name():
+    """Get the name of the currently executing action."""
+    return os.environ.get('JUJU_ACTION_NAME')
+
+
+def action_uuid():
+    """Get the UUID of the currently executing action."""
+    return os.environ.get('JUJU_ACTION_UUID')
+
+
+def action_tag():
+    """Get the tag for the currently executing action."""
+    return os.environ.get('JUJU_ACTION_TAG')
+
+
 def status_set(workload_state, message):
     """Set the workload state with a message
 
@@ -682,25 +810,28 @@ def status_set(workload_state, message):
 
 
 def status_get():
-    """Retrieve the previously set juju workload state
+    """Retrieve the previously set juju workload state and message
 
-    If the status-set command is not found then assume this is juju < 1.23 and
-    return 'unknown'
+    If the status-get command is not found then assume this is juju < 1.23 and
+    return 'unknown', ""
+
     """
-    cmd = ['status-get']
+    cmd = ['status-get', "--format=json", "--include-data"]
     try:
-        raw_status = subprocess.check_output(cmd, universal_newlines=True)
-        status = raw_status.rstrip()
-        return status
+        raw_status = subprocess.check_output(cmd)
     except OSError as e:
         if e.errno == errno.ENOENT:
-            return 'unknown'
+            return ('unknown', "")
         else:
             raise
+    else:
+        status = json.loads(raw_status.decode("UTF-8"))
+        return (status["status"], status["message"])
 
 
 def translate_exc(from_exc, to_exc):
     def inner_translate_exc1(f):
+        @wraps(f)
         def inner_translate_exc2(*args, **kwargs):
             try:
                 return f(*args, **kwargs)
@@ -710,6 +841,20 @@ def translate_exc(from_exc, to_exc):
         return inner_translate_exc2
 
     return inner_translate_exc1
+
+
+def application_version_set(version):
+    """Charm authors may trigger this command from any hook to output what
+    version of the application is running. This could be a package version,
+    for instance postgres version 9.5. It could also be a build number or
+    version control revision identifier, for instance git sha 6fb7ba68. """
+
+    cmd = ['application-version-set']
+    cmd.append(version)
+    try:
+        subprocess.check_call(cmd)
+    except OSError:
+        log("Application Version: {}".format(version))
 
 
 @translate_exc(from_exc=OSError, to_exc=NotImplementedError)
@@ -732,13 +877,145 @@ def leader_get(attribute=None):
 @translate_exc(from_exc=OSError, to_exc=NotImplementedError)
 def leader_set(settings=None, **kwargs):
     """Juju leader set value(s)"""
-    log("Juju leader-set '%s'" % (settings), level=DEBUG)
+    # Don't log secrets.
+    # log("Juju leader-set '%s'" % (settings), level=DEBUG)
     cmd = ['leader-set']
     settings = settings or {}
     settings.update(kwargs)
-    for k, v in settings.iteritems():
+    for k, v in settings.items():
         if v is None:
             cmd.append('{}='.format(k))
         else:
             cmd.append('{}={}'.format(k, v))
     subprocess.check_call(cmd)
+
+
+@translate_exc(from_exc=OSError, to_exc=NotImplementedError)
+def payload_register(ptype, klass, pid):
+    """ is used while a hook is running to let Juju know that a
+        payload has been started."""
+    cmd = ['payload-register']
+    for x in [ptype, klass, pid]:
+        cmd.append(x)
+    subprocess.check_call(cmd)
+
+
+@translate_exc(from_exc=OSError, to_exc=NotImplementedError)
+def payload_unregister(klass, pid):
+    """ is used while a hook is running to let Juju know
+    that a payload has been manually stopped. The <class> and <id> provided
+    must match a payload that has been previously registered with juju using
+    payload-register."""
+    cmd = ['payload-unregister']
+    for x in [klass, pid]:
+        cmd.append(x)
+    subprocess.check_call(cmd)
+
+
+@translate_exc(from_exc=OSError, to_exc=NotImplementedError)
+def payload_status_set(klass, pid, status):
+    """is used to update the current status of a registered payload.
+    The <class> and <id> provided must match a payload that has been previously
+    registered with juju using payload-register. The <status> must be one of the
+    follow: starting, started, stopping, stopped"""
+    cmd = ['payload-status-set']
+    for x in [klass, pid, status]:
+        cmd.append(x)
+    subprocess.check_call(cmd)
+
+
+@translate_exc(from_exc=OSError, to_exc=NotImplementedError)
+def resource_get(name):
+    """used to fetch the resource path of the given name.
+
+    <name> must match a name of defined resource in metadata.yaml
+
+    returns either a path or False if resource not available
+    """
+    if not name:
+        return False
+
+    cmd = ['resource-get', name]
+    try:
+        return subprocess.check_output(cmd).decode('UTF-8')
+    except subprocess.CalledProcessError:
+        return False
+
+
+@cached
+def juju_version():
+    """Full version string (eg. '1.23.3.1-trusty-amd64')"""
+    # Per https://bugs.launchpad.net/juju-core/+bug/1455368/comments/1
+    jujud = glob.glob('/var/lib/juju/tools/machine-*/jujud')[0]
+    return subprocess.check_output([jujud, 'version'],
+                                   universal_newlines=True).strip()
+
+
+@cached
+def has_juju_version(minimum_version):
+    """Return True if the Juju version is at least the provided version"""
+    return LooseVersion(juju_version()) >= LooseVersion(minimum_version)
+
+
+_atexit = []
+_atstart = []
+
+
+def atstart(callback, *args, **kwargs):
+    '''Schedule a callback to run before the main hook.
+
+    Callbacks are run in the order they were added.
+
+    This is useful for modules and classes to perform initialization
+    and inject behavior. In particular:
+
+        - Run common code before all of your hooks, such as logging
+          the hook name or interesting relation data.
+        - Defer object or module initialization that requires a hook
+          context until we know there actually is a hook context,
+          making testing easier.
+        - Rather than requiring charm authors to include boilerplate to
+          invoke your helper's behavior, have it run automatically if
+          your object is instantiated or module imported.
+
+    This is not at all useful after your hook framework as been launched.
+    '''
+    global _atstart
+    _atstart.append((callback, args, kwargs))
+
+
+def atexit(callback, *args, **kwargs):
+    '''Schedule a callback to run on successful hook completion.
+
+    Callbacks are run in the reverse order that they were added.'''
+    _atexit.append((callback, args, kwargs))
+
+
+def _run_atstart():
+    '''Hook frameworks must invoke this before running the main hook body.'''
+    global _atstart
+    for callback, args, kwargs in _atstart:
+        callback(*args, **kwargs)
+    del _atstart[:]
+
+
+def _run_atexit():
+    '''Hook frameworks must invoke this after the main hook body has
+    successfully completed. Do not invoke it if the hook fails.'''
+    global _atexit
+    for callback, args, kwargs in reversed(_atexit):
+        callback(*args, **kwargs)
+    del _atexit[:]
+
+
+@translate_exc(from_exc=OSError, to_exc=NotImplementedError)
+def network_get_primary_address(binding):
+    '''
+    Retrieve the primary network address for a named binding
+
+    :param binding: string. The name of a relation of extra-binding
+    :return: string. The primary IP address for the named binding
+    :raise: NotImplementedError if run on Juju < 2.0
+    '''
+    cmd = ['network-get', '--primary-address', binding]
+    return subprocess.check_output(cmd).decode('UTF-8').strip()

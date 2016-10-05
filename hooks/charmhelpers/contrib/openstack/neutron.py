@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # Various utilies for dealing with Neutron and the renaming from Quantum.
 
@@ -50,7 +48,7 @@ def determine_dkms_package():
     if kernel_version() >= (3, 13):
         return []
     else:
-        return ['openvswitch-datapath-dkms']
+        return [headers_package(), 'openvswitch-datapath-dkms']
 
 
 # legacy
@@ -70,7 +68,7 @@ def quantum_plugins():
                                         relation_prefix='neutron',
                                         ssl_dir=QUANTUM_CONF_DIR)],
             'services': ['quantum-plugin-openvswitch-agent'],
-            'packages': [[headers_package()] + determine_dkms_package(),
+            'packages': [determine_dkms_package(),
                          ['quantum-plugin-openvswitch-agent']],
             'server_packages': ['quantum-server',
                                 'quantum-plugin-openvswitch'],
@@ -111,7 +109,7 @@ def neutron_plugins():
                                         relation_prefix='neutron',
                                         ssl_dir=NEUTRON_CONF_DIR)],
             'services': ['neutron-plugin-openvswitch-agent'],
-            'packages': [[headers_package()] + determine_dkms_package(),
+            'packages': [determine_dkms_package(),
                          ['neutron-plugin-openvswitch-agent']],
             'server_packages': ['neutron-server',
                                 'neutron-plugin-openvswitch'],
@@ -155,7 +153,7 @@ def neutron_plugins():
                                         relation_prefix='neutron',
                                         ssl_dir=NEUTRON_CONF_DIR)],
             'services': [],
-            'packages': [[headers_package()] + determine_dkms_package(),
+            'packages': [determine_dkms_package(),
                          ['neutron-plugin-cisco']],
             'server_packages': ['neutron-server',
                                 'neutron-plugin-cisco'],
@@ -172,14 +170,16 @@ def neutron_plugins():
             'services': ['calico-felix',
                          'bird',
                          'neutron-dhcp-agent',
-                         'nova-api-metadata'],
-            'packages': [[headers_package()] + determine_dkms_package(),
+                         'nova-api-metadata',
+                         'etcd'],
+            'packages': [determine_dkms_package(),
                          ['calico-compute',
                           'bird',
                           'neutron-dhcp-agent',
-                          'nova-api-metadata']],
-            'server_packages': ['neutron-server', 'calico-control'],
-            'server_services': ['neutron-server']
+                          'nova-api-metadata',
+                          'etcd']],
+            'server_packages': ['neutron-server', 'calico-control', 'etcd'],
+            'server_services': ['neutron-server', 'etcd']
         },
         'vsp': {
             'config': '/etc/neutron/plugins/nuage/nuage_plugin.ini',
@@ -193,6 +193,34 @@ def neutron_plugins():
             'packages': [],
             'server_packages': ['neutron-server', 'neutron-plugin-nuage'],
             'server_services': ['neutron-server']
+        },
+        'plumgrid': {
+            'config': '/etc/neutron/plugins/plumgrid/plumgrid.ini',
+            'driver': 'neutron.plugins.plumgrid.plumgrid_plugin.plumgrid_plugin.NeutronPluginPLUMgridV2',
+            'contexts': [
+                context.SharedDBContext(user=config('database-user'),
+                                        database=config('database'),
+                                        ssl_dir=NEUTRON_CONF_DIR)],
+            'services': [],
+            'packages': ['plumgrid-lxc',
+                         'iovisor-dkms'],
+            'server_packages': ['neutron-server',
+                                'neutron-plugin-plumgrid'],
+            'server_services': ['neutron-server']
+        },
+        'midonet': {
+            'config': '/etc/neutron/plugins/midonet/midonet.ini',
+            'driver': 'midonet.neutron.plugin.MidonetPluginV2',
+            'contexts': [
+                context.SharedDBContext(user=config('neutron-database-user'),
+                                        database=config('neutron-database'),
+                                        relation_prefix='neutron',
+                                        ssl_dir=NEUTRON_CONF_DIR)],
+            'services': [],
+            'packages': [determine_dkms_package()],
+            'server_packages': ['neutron-server',
+                                'python-neutron-plugin-midonet'],
+            'server_services': ['neutron-server']
         }
     }
     if release >= 'icehouse':
@@ -203,6 +231,26 @@ def neutron_plugins():
                                              'neutron-plugin-ml2']
         # NOTE: patch in vmware renames nvp->nsx for icehouse onwards
         plugins['nvp'] = plugins['nsx']
+    if release >= 'kilo':
+        plugins['midonet']['driver'] = (
+            'neutron.plugins.midonet.plugin.MidonetPluginV2')
+    if release >= 'liberty':
+        plugins['midonet']['driver'] = (
+            'midonet.neutron.plugin_v1.MidonetPluginV2')
+        plugins['midonet']['server_packages'].remove(
+            'python-neutron-plugin-midonet')
+        plugins['midonet']['server_packages'].append(
+            'python-networking-midonet')
+        plugins['plumgrid']['driver'] = (
+            'networking_plumgrid.neutron.plugins.plugin.NeutronPluginPLUMgridV2')
+        plugins['plumgrid']['server_packages'].remove(
+            'neutron-plugin-plumgrid')
+    if release >= 'mitaka':
+        plugins['nsx']['server_packages'].remove('neutron-plugin-vmware')
+        plugins['nsx']['server_packages'].append('python-vmware-nsx')
+        plugins['nsx']['config'] = '/etc/neutron/nsx.ini'
+        plugins['vsp']['driver'] = (
+            'nuage_neutron.plugins.nuage.plugin.NuagePlugin')
     return plugins
 
 
@@ -253,17 +301,30 @@ def network_manager():
         return 'neutron'
 
 
-def parse_mappings(mappings):
+def parse_mappings(mappings, key_rvalue=False):
+    """By default mappings are lvalue keyed.
+
+    If key_rvalue is True, the mapping will be reversed to allow multiple
+    configs for the same lvalue.
+    """
     parsed = {}
     if mappings:
         mappings = mappings.split()
         for m in mappings:
             p = m.partition(':')
-            key = p[0].strip()
-            if p[1]:
-                parsed[key] = p[2].strip()
+
+            if key_rvalue:
+                key_index = 2
+                val_index = 0
+                # if there is no rvalue skip to next
+                if not p[1]:
+                    continue
             else:
-                parsed[key] = ''
+                key_index = 0
+                val_index = 2
+
+            key = p[key_index].strip()
+            parsed[key] = p[val_index].strip()
 
     return parsed
 
@@ -281,25 +342,25 @@ def parse_bridge_mappings(mappings):
 def parse_data_port_mappings(mappings, default_bridge='br-data'):
     """Parse data port mappings.
 
-    Mappings must be a space-delimited list of bridge:port mappings.
+    Mappings must be a space-delimited list of bridge:port.
 
-    Returns dict of the form {bridge:port}.
+    Returns dict of the form {port:bridge} where ports may be mac addresses or
+    interface names.
     """
-    _mappings = parse_mappings(mappings)
+
+    # NOTE(dosaboy): we use rvalue for key to allow multiple values to be
+    # proposed for <port> since it may be a mac address which will differ
+    # across units this allowing first-known-good to be chosen.
+    _mappings = parse_mappings(mappings, key_rvalue=True)
     if not _mappings or list(_mappings.values()) == ['']:
         if not mappings:
             return {}
 
         # For backwards-compatibility we need to support port-only provided in
         # config.
-        _mappings = {default_bridge: mappings.split()[0]}
+        _mappings = {mappings.split()[0]: default_bridge}
 
-    bridges = _mappings.keys()
-    ports = _mappings.values()
-    if len(set(bridges)) != len(bridges):
-        raise Exception("It is not allowed to have more than one port "
-                        "configured on the same bridge")
-
+    ports = _mappings.keys()
     if len(set(ports)) != len(ports):
         raise Exception("It is not allowed to have the same port configured "
                         "on more than one bridge")
