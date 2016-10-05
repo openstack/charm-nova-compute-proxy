@@ -236,7 +236,7 @@ class CloudComputeContext(context.OSContextGenerator):
         return ctxt
 
 
-class NeutronPowerComputeContext(context.NeutronContext):
+class NeutronRemoteComputeContext(context.NeutronContext):
     interfaces = []
 
     @property
@@ -252,11 +252,11 @@ class NeutronPowerComputeContext(context.NeutronContext):
         return _neutron_security_groups()
 
     def _ensure_packages(self):
-        # NOTE(jamespage) no-op for nova-compute-power
+        # NOTE(jamespage) no-op for nova-compute-proxy
         pass
 
     def _save_flag_file(self):
-        # NOTE(jamespage) no-op for nova-compute-power
+        # NOTE(jamespage) no-op for nova-compute-proxy
         pass
 
     def ovs_ctxt(self):

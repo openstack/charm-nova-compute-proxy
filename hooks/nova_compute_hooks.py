@@ -34,17 +34,17 @@ from nova_compute_utils import (
     NOVA_CONF,
 )
 from nova_compute_proxy import (
-    POWERProxy,
+    REMOTEProxy,
     restart_on_change,
 )
 
 hooks = Hooks()
 CONFIGS = register_configs()
-proxy = POWERProxy(user=config('power-user'),
-                   ssh_key=config('power-key'),
-                   hosts=config('power-hosts'),
-                   repository=config('power-repo'),
-                   password=config('power-password'))
+proxy = REMOTEProxy(user=config('remote-user'),
+                    ssh_key=config('remote-key'),
+                    hosts=config('remote-hosts'),
+                    repository=config('remote-repo'),
+                    password=config('remote-password'))
 
 
 @hooks.hook()

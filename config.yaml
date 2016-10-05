@@ -1,28 +1,28 @@
 options:
   openstack-release:
     type: string
-    default: icehouse
-    description: OpenStack release to use for configuration of POWER hypervisor.
-  power-user:
+    default: mitaka
+    description: OpenStack release to use for configuration of remote compute node.
+  remote-user:
     type: string
     default:
-    description: Username used to access POWER hypervisors.
-  power-key:
+    description: Username used to access remote compute nodes.
+  remote-key:
     type: string
     default:
-    description: SSH key to use to accesss POWER hypervisors.
-  power-repo:
+    description: SSH key to use to access remote compute nodes.
+  remote-repo:
     type: string
     default:
-    description: RPM repository of OpenStack packages to deploy to POWER hypervisors.
-  power-hosts:
+    description: RPM repository of OpenStack packages to deploy to remote compute nodes.
+  remote-hosts:
     type: string
     default:
-    description: POWER hosts to manager; space delimited.
-  power-password:
+    description: Remote compute node hosts to manager; space delimited.
+  remote-password:
     type: string
     default:
-    description: sudo password on POWER hypervisor
+    description: sudo password on remote compute node (NOT recommended). Use ssh key instead.
   rabbit-user:
     default: nova
     type: string
@@ -52,7 +52,9 @@ options:
   config-flags:
     type: string
     default:
-    description: Comma separated list of key=value config flags to be set in nova.conf.
+    description: |
+      Comma-separated list of key=value config flags. These values will be
+      placed in the nova.conf [DEFAULT] section.  Use with caution.
   data-port:
     type: string
     default:
@@ -68,4 +70,3 @@ options:
       .
       BE CAREFUL - this option allows you to disable all port level security within
       an OpenStack cloud.
-

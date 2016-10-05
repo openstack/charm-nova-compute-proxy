@@ -27,7 +27,7 @@ from charmhelpers.contrib.openstack import templating, context
 from nova_compute_context import (
     CloudComputeContext,
     NovaComputeVirtContext,
-    NeutronPowerComputeContext,
+    NeutronRemoteComputeContext,
 )
 
 TEMPLATES = 'templates/'
@@ -60,7 +60,7 @@ NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
         'services': ['neutron-openvswitch-agent'],
-        'contexts': [NeutronPowerComputeContext(),
+        'contexts': [NeutronRemoteComputeContext(),
                      context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR),
                      context.SyslogContext(),
                      context.LogLevelContext()],
@@ -93,13 +93,13 @@ def resource_map():
 
             resource_map[conf] = {}
             resource_map[conf]['services'] = ['neutron-openvswitch-agent']
-            resource_map[conf]['contexts'] = [NeutronPowerComputeContext()]
+            resource_map[conf]['contexts'] = [NeutronRemoteComputeContext()]
         else:
             raise ValueError("Only Neutron ml2/ovs plugin "
                              "is supported on this platform")
 
         resource_map[NOVA_CONF]['contexts'].append(
-            NeutronPowerComputeContext())
+            NeutronRemoteComputeContext())
 
     for conf in resource_map:
         mkdir(os.path.dirname(conf))

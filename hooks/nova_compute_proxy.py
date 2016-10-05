@@ -69,7 +69,7 @@ CONFIG_FILES = [
     '/etc/nova/nova.conf']
 
 
-class POWERProxy():
+class REMOTEProxy():
 
     def __init__(self, user, ssh_key, hosts,
                  repository, password):
@@ -107,7 +107,7 @@ class POWERProxy():
         with open(filename, 'w') as f:
             f.write(_render_template('yum.template', context))
         execute(copy_file_as_root, filename,
-                '/etc/yum.repos.d/openstack-power.repo')
+                '/etc/yum.repos.d/openstack-nova-compute-proxy.repo')
         os.unlink(filename)
 
     def _install_packages(self):
