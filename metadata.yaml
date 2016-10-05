@@ -1,6 +1,6 @@
-name: nova-compute-power
-summary: OpenStack Compute for POWER8
-maintainer: Chuck Short <zulcss@ubuntu.com>
+name: nova-compute-proxy
+summary: OpenStack Compute Proxy for PowerKVM and z/KVM
+maintainer: OpenStack Charmers <openstack-charmers@lists.ubuntu.com>
 description: |
  OpenStack Compute, codenamed Nova, is a cloud computing fabric controller. In
  addition to its "native" API (the OpenStack API), it also supports the Amazon
@@ -20,5 +20,3 @@ requires:
     interface: glance
   neutron-plugin-api:
     interface: neutron-plugin-api
-
-
