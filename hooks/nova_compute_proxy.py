@@ -106,10 +106,10 @@ class REMOTEProxy():
         for repo in self.repository.split(','):
             context = {'yum_repo': repo, 'yum_repo_id': repo_id}
             _, filename = tempfile.mkstemp()
-            with open(filename + repo_id, 'w') as f:
+            with open(filename, 'w') as f:
                 f.write(_render_template('yum.template', context))
             execute(copy_file_as_root, filename,
-                    '/etc/yum.repos.d/openstack-nova-compute-proxy.repo')
+                    '/etc/yum.repos.d/openstack-nova-compute-proxy-{}.repo'.format(repo_id))
             os.unlink(filename)
             repo_id += 1
 
