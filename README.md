@@ -34,7 +34,7 @@ Once you have this setup you must configure the charm as follow:
     * Example:
     ```
     remote-user: youruser
-    remote-repo: file:///tmp/openstack-iso/openstack
+    remote-repo: file:///tmp/openstack-iso/openstack,file:///tmp/other-iso/repofs
     remote-key: id_dsa
     remote-hosts: 10.10.10.10 10.10.10.11
     ```

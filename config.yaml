@@ -14,7 +14,7 @@ options:
   remote-repo:
     type: string
     default:
-    description: RPM repository of OpenStack packages to deploy to remote compute nodes.
+    description: Comma separated list of RPM repositorys of OpenStack packages to deploy to remote compute nodes.
   remote-hosts:
     type: string
     default:
