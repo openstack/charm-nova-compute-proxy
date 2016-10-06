@@ -29,12 +29,12 @@ Once you have this setup you must configure the charm as follow:
   charm.
 * Apply the following charm config:
     * remote-user: username used to access and configure the power node.
-    * remote-repo: Yum repository url or file url
+    * remote-repos: Yum repository url(s) or file url(s)
     * remote-hosts: IP address of power node
     * Example:
     ```
     remote-user: youruser
-    remote-repo: file:///tmp/openstack-iso/openstack,file:///tmp/other-iso/repofs
+    remote-repos: file:///tmp/openstack-iso/openstack,file:///tmp/other-iso/repofs
     remote-key: id_dsa
     remote-hosts: 10.10.10.10 10.10.10.11
     ```

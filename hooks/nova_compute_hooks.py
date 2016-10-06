@@ -43,7 +43,7 @@ CONFIGS = register_configs()
 proxy = REMOTEProxy(user=config('remote-user'),
                     ssh_key=config('remote-key'),
                     hosts=config('remote-hosts'),
-                    repository=config('remote-repo'),
+                    repository=config('remote-repos'),
                     password=config('remote-password'))
 
 
