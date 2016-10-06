@@ -102,13 +102,16 @@ class REMOTEProxy():
 
     def _setup_yum(self):
         log('Setup yum')
-        context = {'yum_repo': self.repository}
-        _, filename = tempfile.mkstemp()
-        with open(filename, 'w') as f:
-            f.write(_render_template('yum.template', context))
-        execute(copy_file_as_root, filename,
-                '/etc/yum.repos.d/openstack-nova-compute-proxy.repo')
-        os.unlink(filename)
+        repo_id = 1
+        for repo in self.repository.split(','):
+            context = {'yum_repo': repo, 'yum_repo_id': repo_id}
+            _, filename = tempfile.mkstemp()
+            with open(filename + repo_id, 'w') as f:
+                f.write(_render_template('yum.template', context))
+            execute(copy_file_as_root, filename,
+                    '/etc/yum.repos.d/openstack-nova-compute-proxy.repo')
+            os.unlink(filename)
+            repo_id += 1
 
     def _install_packages(self):
         execute(yum_install, PACKAGES)
