@@ -6,8 +6,8 @@ description: |
  addition to its "native" API (the OpenStack API), it also supports the Amazon
  EC2 API.
  .
- This charm acts as a proxy to remote configure multiple PowerKVM hosts, which
- don't run Ubuntu.
+ This charm acts as a proxy to remotely configure multiple z/KVM or PowerKVM
+ hosts which are not running Ubuntu.
 tags:
   - openstack
 series:
