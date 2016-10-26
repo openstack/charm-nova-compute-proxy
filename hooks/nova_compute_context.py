@@ -21,56 +21,15 @@ from charmhelpers.core.hookenv import (
     related_units,
     ERROR,
 )
+from charmhelpers.core.strutils import (
+    bool_from_string,
+)
 
 
 # compatability functions to help with quantum -> neutron transition
 def _network_manager():
     from nova_compute_utils import network_manager as manager
     return manager()
-
-
-def _neutron_api_settings():
-    '''
-    Inspects current neutron-plugin relation
-    '''
-    neutron_settings = {
-        'neutron_security_groups': False,
-        'l2_population': True,
-        'overlay_network_type': 'gre',
-    }
-    for rid in relation_ids('neutron-plugin-api'):
-        for unit in related_units(rid):
-            rdata = relation_get(rid=rid, unit=unit)
-            if 'l2-population' not in rdata:
-                continue
-            neutron_settings = {
-                'l2_population': rdata['l2-population'],
-                'neutron_security_groups': rdata['neutron-security-groups'],
-                'overlay_network_type': rdata['overlay-network-type'],
-            }
-            # Override with configuration if set to true
-            if config('disable-security-groups'):
-                neutron_settings['neutron_security_groups'] = False
-            return neutron_settings
-    return neutron_settings
-
-
-def _neutron_security_groups():
-    '''
-    Inspects current cloud-compute relation and determine if nova-c-c has
-    instructed us to use neutron security groups.
-    '''
-    for rid in relation_ids('cloud-compute'):
-        for unit in related_units(rid):
-            groups = [
-                relation_get('neutron_security_groups',
-                             rid=rid, unit=unit),
-                relation_get('quantum_security_groups',
-                             rid=rid, unit=unit)
-            ]
-            if ('yes' in groups or 'Yes' in groups):
-                return True
-    return False
 
 
 def _neutron_plugin():
@@ -91,7 +50,12 @@ class NovaComputeVirtContext(context.OSContextGenerator):
         ctxt = {}
         if config('instances-path') is not None:
             ctxt['instances_path'] = config('instances-path')
-        return {}
+        if config('cpu-mode'):
+            ctxt['cpu_mode'] = config('cpu-mode')
+        if config('cpu-model'):
+            ctxt['cpu_model'] = config('cpu-model')
+        ctxt['reserved_host_memory'] = config('reserved-host-memory')
+        return ctxt
 
 
 class CloudComputeContext(context.OSContextGenerator):
@@ -148,6 +112,8 @@ class CloudComputeContext(context.OSContextGenerator):
                         'auth_protocol', **rel) or 'http',
                     'service_protocol': relation_get(
                         'service_protocol', **rel) or 'http',
+                    'service_port': relation_get(
+                        'service_port', **rel),
                     'neutron_auth_strategy': 'keystone',
                     'keystone_host': relation_get(
                         'auth_host', **rel),
@@ -168,8 +134,6 @@ class CloudComputeContext(context.OSContextGenerator):
             log('Missing required relation settings for Quantum: ' +
                 ' '.join(missing))
             return {}
-
-        neutron_ctxt['neutron_security_groups'] = _neutron_security_groups()
 
         ks_url = '%s://%s:%s/v2.0' % (neutron_ctxt['auth_protocol'],
                                       neutron_ctxt['keystone_host'],
@@ -225,6 +189,19 @@ class CloudComputeContext(context.OSContextGenerator):
         if net_manager:
             ctxt['network_manager'] = self.network_manager
             ctxt['network_manager_config'] = net_manager
+            # This is duplicating information in the context to enable
+            # common keystone fragment to be used in template
+            ctxt['service_protocol'] = net_manager.get('service_protocol')
+            ctxt['service_host'] = net_manager.get('keystone_host')
+            ctxt['service_port'] = net_manager.get('service_port')
+            ctxt['admin_tenant_name'] = net_manager.get(
+                'neutron_admin_tenant_name')
+            ctxt['admin_user'] = net_manager.get('neutron_admin_username')
+            ctxt['admin_password'] = net_manager.get('neutron_admin_password')
+            ctxt['auth_protocol'] = net_manager.get('auth_protocol')
+            ctxt['auth_host'] = net_manager.get('keystone_host')
+            ctxt['auth_port'] = net_manager.get('auth_port')
+            ctxt['api_version'] = net_manager.get('api_version')
 
         vol_service = self.volume_context()
         if vol_service:
@@ -237,7 +214,7 @@ class CloudComputeContext(context.OSContextGenerator):
 
 
 class NeutronRemoteComputeContext(context.NeutronContext):
-    interfaces = []
+    interfaces = ['neutron-plugin-api']
 
     @property
     def plugin(self):
@@ -246,10 +223,6 @@ class NeutronRemoteComputeContext(context.NeutronContext):
     @property
     def network_manager(self):
         return _network_manager()
-
-    @property
-    def neutron_security_groups(self):
-        return _neutron_security_groups()
 
     def _ensure_packages(self):
         # NOTE(jamespage) no-op for nova-compute-proxy
@@ -266,5 +239,41 @@ class NeutronRemoteComputeContext(context.NeutronContext):
             'neutron_security_groups': self.neutron_security_groups,
             'config': '/etc/neutron/plugins/ml2/ml2_conf.ini'
         }
-        ovs_ctxt.update(_neutron_api_settings())
+        neutron_api_settings = context.NeutronAPIContext()()
+        ovs_ctxt['neutron_security_groups'] = \
+            neutron_api_settings['neutron_security_groups']
+        ovs_ctxt['l2_population'] = neutron_api_settings['l2_population']
+        ovs_ctxt['distributed_routing'] = neutron_api_settings['enable_dvr']
+        ovs_ctxt['overlay_network_type'] = \
+            neutron_api_settings['overlay_network_type']
+        ovs_ctxt['prevent_arp_spoofing'] = config('prevent-arp-spoofing')
         return ovs_ctxt
+
+
+class SerialConsoleContext(context.OSContextGenerator):
+
+    @property
+    def enable_serial_console(self):
+        for rid in relation_ids('cloud-compute'):
+            for unit in related_units(rid):
+                _enable_sc = relation_get('enable_serial_console', rid=rid,
+                                          unit=unit)
+                if _enable_sc and bool_from_string(_enable_sc):
+                    return 'true'
+        return 'false'
+
+    @property
+    def serial_console_base_url(self):
+        for rid in relation_ids('cloud-compute'):
+            for unit in related_units(rid):
+                base_url = relation_get('serial_console_base_url',
+                                        rid=rid, unit=unit)
+                if base_url is not None:
+                    return base_url
+        return 'ws://127.0.0.1:6083/'
+
+    def __call__(self):
+        return {
+            'enable_serial_console': self.enable_serial_console,
+            'serial_console_base_url': self.serial_console_base_url,
+        }

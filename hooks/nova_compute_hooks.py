@@ -32,6 +32,7 @@ from nova_compute_utils import (
     restart_map,
     register_configs,
     NOVA_CONF,
+    assess_status,
 )
 from nova_compute_proxy import (
     REMOTEProxy,
@@ -98,7 +99,8 @@ def compute_joined(rid=None):
     pass
 
 
-@hooks.hook('cloud-compute-relation-changed')
+@hooks.hook('cloud-compute-relation-changed',
+            'neutron-plugin-api-relation-changed')
 @restart_on_change(restart_map(), proxy.restart_service)
 def compute_changed():
     CONFIGS.write_all()
@@ -106,7 +108,8 @@ def compute_changed():
 
 
 @hooks.hook('amqp-relation-broken',
-            'image-service-relation-broken')
+            'image-service-relation-broken',
+            'neutron-plugin-api-relation-broken')
 @restart_on_change(restart_map(), proxy.restart_service)
 def relation_broken():
     CONFIGS.write_all()
@@ -132,3 +135,4 @@ if __name__ == '__main__':
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         log('Unknown hook {} - skipping.'.format(e))
+    assess_status(CONFIGS)

@@ -19,23 +19,35 @@ from charmhelpers.core.hookenv import (
     related_units,
     relation_ids,
     relation_get,
-    service_name
+    service_name,
+    status_set,
+    application_version_set,
 )
 from charmhelpers.core.host import mkdir
 from charmhelpers.contrib.openstack import templating, context
+from charmhelpers.contrib.openstack.utils import (
+    _determine_os_workload_status,
+)
 
 from nova_compute_context import (
     CloudComputeContext,
     NovaComputeVirtContext,
     NeutronRemoteComputeContext,
+    SerialConsoleContext,
 )
 
 TEMPLATES = 'templates/'
 
-CHARM_SCRATCH_DIR = '/var/lib/charm/%s' % service_name()
+REQUIRED_INTERFACES = {
+    'messaging': ['amqp'],
+    'image': ['image-service'],
+    'neutron': ['neutron-plugin-api'],
+}
 
-NOVA_CONF_DIR = "%s/etc/nova" % CHARM_SCRATCH_DIR
-NOVA_CONF = '%s/nova.conf' % NOVA_CONF_DIR
+CHARM_SCRATCH_DIR = '/var/lib/charm/{}'.format(service_name())
+
+NOVA_CONF_DIR = "{}/etc/nova".format(CHARM_SCRATCH_DIR)
+NOVA_CONF = '{}/nova.conf'.format(NOVA_CONF_DIR)
 
 BASE_RESOURCE_MAP = {
     NOVA_CONF: {
@@ -45,6 +57,7 @@ BASE_RESOURCE_MAP = {
                      context.OSConfigFlagContext(),
                      CloudComputeContext(),
                      NovaComputeVirtContext(),
+                     SerialConsoleContext(),
                      context.SyslogContext(),
                      context.LogLevelContext(),
                      context.SubordinateConfigContext(
@@ -54,8 +67,13 @@ BASE_RESOURCE_MAP = {
     },
 }
 
-NEUTRON_CONF_DIR = "%s/etc/neutron" % CHARM_SCRATCH_DIR
-NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
+NEUTRON_CONF_DIR = "{}/etc/neutron".format(CHARM_SCRATCH_DIR)
+NEUTRON_CONF = '{}/neutron.conf'.format(NEUTRON_CONF_DIR)
+
+OVS_AGENT_CONF = (
+    '{}/etc/neutron/plugins/ml2/'
+    'openvswitch_agent.ini'.format(CHARM_SCRATCH_DIR)
+)
 
 NEUTRON_RESOURCES = {
     NEUTRON_CONF: {
@@ -64,6 +82,10 @@ NEUTRON_RESOURCES = {
                      context.AMQPContext(ssl_dir=NEUTRON_CONF_DIR),
                      context.SyslogContext(),
                      context.LogLevelContext()],
+    },
+    OVS_AGENT_CONF: {
+        'services': ['neutron-openvswitch-agent'],
+        'contexts': [NeutronRemoteComputeContext()],
     }
 }
 
@@ -87,15 +109,8 @@ def resource_map():
         if plugin in ['ovs', 'ml2']:
             nm_rsc = NEUTRON_RESOURCES
             resource_map.update(nm_rsc)
-
-            conf = '{}/etc/neutron/plugins/ml2/ml2_conf.ini'.format(
-                CHARM_SCRATCH_DIR)
-
-            resource_map[conf] = {}
-            resource_map[conf]['services'] = ['neutron-openvswitch-agent']
-            resource_map[conf]['contexts'] = [NeutronRemoteComputeContext()]
         else:
-            raise ValueError("Only Neutron ml2/ovs plugin "
+            raise ValueError("Only Neutron ML2/ovs plugin "
                              "is supported on this platform")
 
         resource_map[NOVA_CONF]['contexts'].append(
@@ -167,3 +182,30 @@ def network_manager():
         if manager in ['quantum', 'neutron']:
             return 'neutron'
     return manager
+
+
+def assess_status(configs):
+    """Assess status of current unit
+    Decides what the state of the unit should be based on the current
+    configuration.
+    @param configs: a templating.OSConfigRenderer() object
+    @returns None - this function is executed for its side-effect
+    """
+    state, message = _determine_os_workload_status(configs,
+                                                   REQUIRED_INTERFACES.copy())
+    if state != 'active':
+        status_set(state, message)
+    else:
+        remote_hosts = config('remote-hosts')
+        if remote_hosts:
+            remote_hosts = remote_hosts.split()
+            status_set(
+                'active',
+                'Unit is ready (managing: {})'.format(','.join(remote_hosts))
+            )
+        else:
+            status_set(
+                'blocked',
+                'Missing remote-hosts configuration'
+            )
+    application_version_set(config('openstack-release'))

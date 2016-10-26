@@ -10,6 +10,9 @@ description: |
  don't run Ubuntu.
 tags:
   - openstack
+series:
+  - xenial
+  - trusty
 provides:
   cloud-compute:
     interface: nova-compute

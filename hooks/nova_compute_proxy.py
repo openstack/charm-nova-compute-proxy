@@ -37,7 +37,6 @@ from fabfile import (
     disable_shell,
     fix_path_ownership,
     fix_selinux_permission,
-    fix_ml2_plugin_config,
     fix_local_ip
 )
 from nova_compute_utils import CHARM_SCRATCH_DIR
@@ -59,13 +58,12 @@ except ImportError:
 TEMPLATE_DIR = 'templates'
 
 PACKAGES = ['openstack-nova-compute',
-            'openstack-neutron-ml2',
             'openstack-neutron-openvswitch',
             'python-neutronclient']
 
 CONFIG_FILES = [
     '/etc/neutron/neutron.conf',
-    '/etc/neutron/plugins/ml2/ml2_conf.ini',
+    '/etc/neutron/plugins/ml2/openvswitch_agent.ini',
     '/etc/nova/nova.conf']
 
 
@@ -98,7 +96,6 @@ class REMOTEProxy():
     def install(self):
         self._setup_yum()
         self._install_packages()
-        self._fix_ml2_plugin_config()
 
     def _setup_yum(self):
         log('Setup yum')
@@ -109,15 +106,13 @@ class REMOTEProxy():
             with open(filename, 'w') as f:
                 f.write(_render_template('yum.template', context))
             execute(copy_file_as_root, filename,
-                    '/etc/yum.repos.d/openstack-nova-compute-proxy-{}.repo'.format(repo_id))
+                    '/etc/yum.repos.d/'
+                    'openstack-nova-compute-proxy-{}.repo'.format(repo_id))
             os.unlink(filename)
             repo_id += 1
 
     def _install_packages(self):
         execute(yum_install, PACKAGES)
-
-    def _fix_ml2_plugin_config(self):
-        execute(fix_ml2_plugin_config)
 
     def configure(self):
         self.add_bridges()
@@ -157,7 +152,8 @@ class REMOTEProxy():
         self._fixup_local_ips()
 
     def _fixup_local_ips(self):
-        execute(fix_local_ip, '/etc/neutron/plugins/ml2/ml2_conf.ini')
+        execute(fix_local_ip, '/etc/neutron/plugins/ml2/openvswitch_agent.ini')
+        execute(fix_local_ip, '/etc/nova/nova.conf')
 
 
 def _render_template(template_name, context, template_dir=TEMPLATE_DIR):

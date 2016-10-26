@@ -70,3 +70,35 @@ options:
       .
       BE CAREFUL - this option allows you to disable all port level security within
       an OpenStack cloud.
+  prevent-arp-spoofing:
+    type: boolean
+    default: true
+    description: |
+      Enable suppression of ARP responses that don't match an IP address that belongs
+      to the port from which they originate.
+      .
+      Only supported in OpenStack Liberty or newer, which has the required minimum version
+      of Open vSwitch.
+  cpu-mode:
+    type: string
+    default:
+    description: |
+      Set to 'host-model' to clone the host CPU feature flags; to 
+      'host-passthrough' to use the host CPU model exactly; to 'custom' to 
+      use a named CPU model; to 'none' to not set any CPU model. If 
+      virt_type='kvm|qemu', it will default to 'host-model', otherwise it will 
+      default to 'none'.  Defaults to 'host-passthrough' for ppc64el, ppc64le
+      if no value is set.
+  cpu-model:
+    type: string
+    default:
+    description: |
+      Set to a named libvirt CPU model (see names listed in 
+      /usr/share/libvirt/cpu_map.xml). Only has effect if cpu_mode='custom' and 
+      virt_type='kvm|qemu'.
+  reserved-host-memory:
+    type: int
+    default: 512
+    description: |
+      Amount of memory in MB to reserve for the host. Defaults to 512MB.
+

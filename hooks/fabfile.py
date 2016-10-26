@@ -75,10 +75,5 @@ def fix_selinux_permission(path):
          '{}'.format(path))
 
 
-def fix_ml2_plugin_config():
-    sudo('sed -i "s!openvswitch/ovs_neutron_plugin.ini'
-         '!ml2/ml2_conf.ini!g" /etc/init.d/neutron-openvswitch-agent')
-
-
 def fix_local_ip(f):
     sudo('sed -i "s!LOCAL_IP!%s!g" %s' % (env.host, f))
