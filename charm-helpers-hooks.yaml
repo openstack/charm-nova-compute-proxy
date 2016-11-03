@@ -14,3 +14,5 @@ include:
     - contrib.python.packages
     - payload
     - contrib.charmsupport
+    - contrib.hardening|inc=*
+

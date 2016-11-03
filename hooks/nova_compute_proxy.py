@@ -72,6 +72,8 @@ class REMOTEProxy():
     def __init__(self, user, ssh_key, hosts,
                  repository, password):
         if None in [user, ssh_key, hosts, repository]:
+            # XXX: Charm should block instead.
+            #      https://bugs.launchpad.net/bugs/1638772
             raise Exception('Missing configuration')
         self.user = user
         self.ssh_key = ssh_key

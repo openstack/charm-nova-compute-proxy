@@ -81,7 +81,7 @@ options:
       of Open vSwitch.
   cpu-mode:
     type: string
-    default:
+    default: none
     description: |
       Set to 'host-model' to clone the host CPU feature flags; to 
       'host-passthrough' to use the host CPU model exactly; to 'custom' to 
@@ -101,4 +101,3 @@ options:
     default: 512
     description: |
       Amount of memory in MB to reserve for the host. Defaults to 512MB.
-

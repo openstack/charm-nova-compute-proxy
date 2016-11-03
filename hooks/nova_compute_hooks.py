@@ -48,7 +48,7 @@ proxy = REMOTEProxy(user=config('remote-user'),
                     password=config('remote-password'))
 
 
-@hooks.hook()
+@hooks.hook('install.real')
 def install():
     apt_install(['fabric'], fatal=True)
     proxy.install()
@@ -128,6 +128,12 @@ def upgrade_charm():
 def nova_ceilometer_relation_changed():
     CONFIGS.write_all()
     proxy.commit()
+
+
+@hooks.hook('update-status')
+def update_status():
+    log('Updating status.')
+    assess_status(CONFIGS)
 
 
 if __name__ == '__main__':

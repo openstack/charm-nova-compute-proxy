@@ -1,9 +1,8 @@
 #!/usr/bin/make
 PYTHON := /usr/bin/env python
 
-lint:
-	@flake8 --exclude hooks/charmhelpers hooks
-	@charm proof
+clean:
+	@rm -fv files/*
 
 bin/charm_helpers_sync.py:
 	@mkdir -p bin
@@ -11,5 +10,5 @@ bin/charm_helpers_sync.py:
 	> bin/charm_helpers_sync.py
 
 sync: bin/charm_helpers_sync.py
-	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers.yaml
+	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers-hooks.yaml
 

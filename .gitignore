@@ -14,3 +14,5 @@ tests/cirros-*-disk.img
 .project
 .pydevproject
 revision
+func-results*
+files/id*
