@@ -17,12 +17,14 @@ import tempfile
 from collections import OrderedDict
 
 from charmhelpers.core.hookenv import (
-    charm_dir,
     log,
     config,
+    service_name
 )
 from charmhelpers.core.host import (
-    file_hash
+    file_hash,
+    mkdir,
+    write_file,
 )
 from charmhelpers.fetch import (
     apt_install,
@@ -33,6 +35,8 @@ from fabfile import (
     copy_file_as_root,
     yum_install,
     restart_service,
+    start_service,
+    enable_service,
     enable_shell,
     disable_shell,
     fix_path_ownership,
@@ -61,6 +65,10 @@ PACKAGES = ['openstack-nova-compute',
             'openstack-neutron-openvswitch',
             'python-neutronclient']
 
+SERVICES = ['openstack-nova-compute',
+            'neutron-openvswitch-agent',
+            'openvswitch']
+
 CONFIG_FILES = [
     '/etc/neutron/neutron.conf',
     '/etc/neutron/plugins/ml2/openvswitch_agent.ini',
@@ -84,7 +92,13 @@ class REMOTEProxy():
         self._init_fabric()
 
     def _write_key(self):
-        return os.path.join(charm_dir(), 'files', self.ssh_key)
+        key_path = os.path.join('/var/lib/charm',
+                                service_name(),
+                                'ssh_key')
+        mkdir(os.path.dirname(key_path))
+        write_file(key_path, self.ssh_key,
+                   perms=0o400)
+        return key_path
 
     def _init_fabric(self):
         env.warn_only = True
@@ -98,6 +112,7 @@ class REMOTEProxy():
     def install(self):
         self._setup_yum()
         self._install_packages()
+        self._enable_services()
 
     def _setup_yum(self):
         log('Setup yum')
@@ -115,6 +130,11 @@ class REMOTEProxy():
 
     def _install_packages(self):
         execute(yum_install, PACKAGES)
+
+    def _enable_services(self):
+        for service in SERVICES:
+            execute(enable_service, service)
+            execute(start_service, service)
 
     def configure(self):
         self.add_bridges()

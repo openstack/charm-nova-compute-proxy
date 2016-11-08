@@ -25,16 +25,27 @@ advance:
 
 Once you have this setup you must configure the charm as follow:
 
-* Place the key to the nova-compute node in the files directory of the
-  charm.
 * Apply the following charm config:
     * remote-user: username used to access and configure the power node.
     * remote-repos: Yum repository url(s) or file url(s)
     * remote-hosts: IP address of power node
+    * remote-key: Private key string to use for access
     * Example:
     ```
     remote-user: youruser
     remote-repos: file:///tmp/openstack-iso/openstack,file:///tmp/other-iso/repofs
-    remote-key: id_dsa
+    remote-key: |
+      -----BEGIN DSA PRIVATE KEY-----
+      MIIBugIBAAKBgQD3IG188Q07kQdbRJhlZqknNpoGDB1r9+XGq9+7nmWGKusbOn6L
+      5VdyoHnx0BvgHHJmOAvJ+39sex9KvToEM0Jfav30EfffVzIrjaZZBMZkO/kWkEdd
+      TJrpMoW5nqiyNQRHCJWKkTiT7hNwS7AzUFkH1cR16bkabUfNhx3nWVsfGQIVAM7l
+      FlrJwujvWxOOHIRrihVmnUylAoGBAKGjWAPuj23p2II8NSTfaK/VJ9CyEF1RQ4Pv
+      +wtCRRE/DoN/3jpFnQz8Yjt6dYEewdcWFDG9aJ/PLvm/qX335TSz86pfYBd2Q3dp
+      9/RuaXTnLK6L/gdgkGcDXG8fy2kk0zteNjMjpzbaYpjZmIQ4lu3StUkwTm8EppZz
+      b0KXUNhwAn8bSTxNIZnlfoYzzwT2XPjHMlqeFbYxJMo9Dk5+AY6+tmr4/uR5ySDD
+      A+Txxh7RPhIBQwrIdGlOYOR3Mh03NcYuU+yrUsv4xLP8SeWcfiuAXFctXu0kzvPC
+      uIQ1EfKCrOtbWPcbza2ipo1J8MN/vzLCu69Jdq8af0OqJFoDcY0vAhUAxh2BNdRr
+      HyF1bGCP1t8JdMJVtb0=
+      -----END DSA PRIVATE KEY-----
     remote-hosts: 10.10.10.10 10.10.10.11
     ```

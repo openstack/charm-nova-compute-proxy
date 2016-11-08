@@ -123,6 +123,9 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
             if not os.path.exists(key_file_path):
                 raise
 
+        with open('files/id_rsa_tmp', 'r') as key_file:
+            self.ssh_key = key_file.read()
+
         # Copy new local test pub key into remote-compute and
         # add it to the authorized_hosts.
         u.log.debug('Copying pub key into simulated remote-compute host')
@@ -206,7 +209,7 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
         nova_config = {
             'remote-user': 'ubuntu',
             'remote-repos': "file:///mnt/osmitakacomp,file:///mnt/osprereqs",
-            'remote-key': 'id_rsa_tmp',
+            'remote-key': self.ssh_key,
             'remote-hosts': str(self.compute_addr),
         }
         nova_cc_config = {}
@@ -393,7 +396,7 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
                 'my_ip': 'LOCAL_IP',
             },
             'oslo_concurrency': {
-                'lock_path': '/var/lock/nova'
+                'lock_path': '/var/lib/nova/tmp'
             },
             'oslo_messaging_rabbit': {
                 'rabbit_userid': 'nova',

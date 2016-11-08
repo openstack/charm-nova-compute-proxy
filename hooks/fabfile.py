@@ -40,22 +40,30 @@ def copy_file_as_root(src, dest):
 
 
 def yum_install(packages):
-    sudo('yum install --skip-broken -y %s' % ' '.join(packages))
+    sudo('yum install --skip-broken -y {}'.format(' '.join(packages)))
 
 
 def restart_service(service):
-    sudo('service %s restart' % service)
+    sudo('systemctl restart {}'.format(service))
+
+
+def start_service(service):
+    sudo('systemctl start {}'.format(service))
+
+
+def enable_service(service):
+    sudo('systemctl enable {}'.format(service))
 
 
 def add_bridge(bridge_name):
-    sudo('ovs-vsctl -- --may-exist add-br %s' % bridge_name)
+    sudo('ovs-vsctl -- --may-exist add-br {}'.format(bridge_name))
 
 
 def add_bridge_port(bridge_name, port):
-    sudo('ovs-vsctl -- --may-exist add-port %s %s' % (bridge_name,
-                                                      port))
-    sudo('ip link set %s up' % port)
-    sudo('ip link set %s promisc on' % port)
+    sudo('ovs-vsctl -- --may-exist add-port {} {}'.format(bridge_name,
+                                                          port))
+    sudo('ip link set {} up'.format(port))
+    sudo('ip link set {} promisc on'.format(port))
 
 
 def enable_shell(user):
@@ -76,4 +84,4 @@ def fix_selinux_permission(path):
 
 
 def fix_local_ip(f):
-    sudo('sed -i "s!LOCAL_IP!%s!g" %s' % (env.host, f))
+    sudo('sed -i "s!LOCAL_IP!{}!g" {}'.format(env.host, f))
