@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Amulet tests on a basic nova compute deployment on xenial-mitaka."""
+"""Amulet tests on a basic nova compute deployment on zesty-ocata."""
 
 from basic_deployment import NovaBasicDeployment
 
 if __name__ == '__main__':
-    deployment = NovaBasicDeployment(series='yakkety')
+    deployment = NovaBasicDeployment(series='zesty')
     deployment.run_tests()

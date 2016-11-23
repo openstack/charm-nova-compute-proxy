@@ -173,8 +173,8 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
             {'name': 'neutron-gateway'},
             {'name': 'percona-cluster', 'constraints': {'mem': '3072M'}},
         ]
-        super(NovaBasicDeployment, self)._add_services(this_service,
-                                                       other_services)
+        super(NovaBasicDeployment, self)._add_services(
+            this_service, other_services, no_origin=['nova-compute-proxy'])
 
     def _add_relations(self):
         """Add all of the relations for the services."""
