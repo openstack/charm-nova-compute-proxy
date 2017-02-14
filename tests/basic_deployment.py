@@ -201,6 +201,8 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
             'neutron-api:neutron-plugin-api': 'neutron-gateway:'
                                               'neutron-plugin-api',
             'neutron-api:identity-service': 'keystone:identity-service',
+            'nova-cloud-controller:quantum-network-service':
+            'neutron-gateway:quantum-network-service',
         }
         super(NovaBasicDeployment, self)._add_relations(relations)
 
