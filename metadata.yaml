@@ -12,6 +12,7 @@ tags:
   - openstack
 series:
   - xenial
+  - zesty
   - trusty
 provides:
   cloud-compute:
