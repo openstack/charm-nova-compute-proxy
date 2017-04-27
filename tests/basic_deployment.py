@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import subprocess
 import amulet
 import juju_wait
+import os
+import subprocess
+import yaml
 
 from charmhelpers.contrib.openstack.amulet.deployment import (
     OpenStackAmuletDeployment
@@ -72,6 +73,11 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
 
         self._initialize_tests()
 
+    def _get_status(self):
+        get_status_cmd = ['juju', 'status', '--format', 'yaml']
+        self.status = yaml.load(subprocess.check_output(get_status_cmd))
+        return self.status
+
     def _pre_deploy_remote_compute(self):
         """Add a simulated remote machine ahead of the actual deployment.
         This is done outside of Amulet because Amulet only supports one
@@ -88,18 +94,25 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
 
         if not compute_deployed:
             u.log.debug('Pre-deploying a simulated remote-compute unit')
-            cmd = ['juju', 'deploy', 'ubuntu', 'remote-compute']
+            cmd = ['juju', 'deploy', 'cs:ubuntu', 'remote-compute']
             subprocess.check_call(cmd)
 
-        u.log.debug('Using juju_wait to wait for remote-compute deployment')
-        juju_wait.wait(max_wait=900)
+            u.log.debug('Using juju_wait to wait for remote-compute '
+                        'deployment')
+            juju_wait.wait(max_wait=900)
+
+        self.remote_compute = (self._get_status()['applications']
+                               ['remote-compute']['units'].keys()[0])
+
+        u.log.debug('Simulated remote compute: '
+                    '{}'.format(self.remote_compute))
 
         # Discover IP address of remote-compute unit
-        cmd = ['juju', 'run', '--service',
+        cmd = ['juju', 'run', '--application',
                'remote-compute', 'unit-get public-address']
 
-        self.compute_addr = \
-            subprocess.check_output(cmd).decode('UTF-8').strip()
+        self.compute_addr = (
+            subprocess.check_output(cmd).decode('UTF-8').strip())
 
         u.log.debug('Simulated remote compute address: '
                     '{}'.format(self.compute_addr))
@@ -134,21 +147,21 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
         auth_file = os.path.join(os.sep, 'home', 'ubuntu',
                                  '.ssh', 'authorized_keys')
         cmd = ['juju', 'scp', src_file,
-               'ubuntu@{}:{}'.format(self.compute_addr, dst_file)]
+               '{}:{}'.format(self.remote_compute, dst_file)]
         subprocess.check_call(cmd)
 
         u.log.debug('Adding pub key to authorized_hosts on the simulated '
                     'remote-compute host')
-        cmd = ['juju', 'ssh', 'ubuntu@{}'.format(self.compute_addr),
+        cmd = ['juju', 'ssh', '{}'.format(self.remote_compute),
                'cat {} >> {}'.format(dst_file, auth_file)]
         subprocess.check_call(cmd)
 
         u.log.debug('Installing and enabling yum on remote compute host')
-        cmd = ['juju', 'ssh', 'ubuntu@{}'.format(self.compute_addr),
+        cmd = ['juju', 'ssh', '{}'.format(self.remote_compute),
                'sudo apt-get install yum yum-utils -y']
         subprocess.check_call(cmd)
 
-        cmd = ['juju', 'ssh', 'ubuntu@{}'.format(self.compute_addr),
+        cmd = ['juju', 'ssh', '{}'.format(self.remote_compute),
                'sudo yum-config-manager --enable']
         subprocess.check_call(cmd)
 

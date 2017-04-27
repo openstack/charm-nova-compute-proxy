@@ -12,8 +12,9 @@ tags:
   - openstack
 series:
   - xenial
-  - zesty
   - trusty
+  - yakkety
+  - zesty
 provides:
   cloud-compute:
     interface: nova-compute
