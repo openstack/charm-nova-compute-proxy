@@ -76,7 +76,7 @@ class NovaComputeContextTests(CharmTestCase):
     def test_cloud_compute_context_no_relation(self):
         self.relation_ids.return_value = []
         cloud_compute = context.CloudComputeContext()
-        self.assertEquals({}, cloud_compute())
+        self.assertEqual({}, cloud_compute())
 
     @patch.object(context, '_network_manager')
     def test_cloud_compute_context_restart_trigger(self, nm):
@@ -85,12 +85,12 @@ class NovaComputeContextTests(CharmTestCase):
         with patch.object(cloud_compute, 'restart_trigger') as rt:
             rt.return_value = 'footrigger'
             ctxt = cloud_compute()
-        self.assertEquals(ctxt.get('restart_trigger'), 'footrigger')
+        self.assertEqual(ctxt.get('restart_trigger'), 'footrigger')
 
         with patch.object(cloud_compute, 'restart_trigger') as rt:
             rt.return_value = None
             ctxt = cloud_compute()
-        self.assertEquals(ctxt.get('restart_trigger'), None)
+        self.assertEqual(ctxt.get('restart_trigger'), None)
 
     @patch.object(context, '_network_manager')
     def test_cloud_compute_volume_context_cinder(self, netman):
@@ -99,7 +99,7 @@ class NovaComputeContextTests(CharmTestCase):
         self.related_units.return_value = 'nova-cloud-controller/0'
         cloud_compute = context.CloudComputeContext()
         self.test_relation.set({'volume_service': 'cinder'})
-        self.assertEquals({'volume_service': 'cinder'}, cloud_compute())
+        self.assertEqual({'volume_service': 'cinder'}, cloud_compute())
 
 
 class SerialConsoleContextTests(CharmTestCase):
