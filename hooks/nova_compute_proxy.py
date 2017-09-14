@@ -39,6 +39,7 @@ from fabfile import (
     enable_service,
     enable_shell,
     disable_shell,
+    allow_gre_firewalld,
     fix_path_ownership,
     fix_selinux_permission,
     fix_local_ip
@@ -112,7 +113,11 @@ class REMOTEProxy():
     def install(self):
         self._setup_yum()
         self._install_packages()
+        self._allow_gre_firewalld()
         self._enable_services()
+
+    def _allow_gre_firewalld(self):
+        execute(allow_gre_firewalld)
 
     def _setup_yum(self):
         log('Setup yum')

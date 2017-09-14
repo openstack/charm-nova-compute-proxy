@@ -83,5 +83,10 @@ def fix_selinux_permission(path):
          '{}'.format(path))
 
 
+def allow_gre_firewalld():
+    sudo('firewall-cmd --permanent --direct \
+         --add-rule ipv4 filter INPUT 0 -p gre -j ACCEPT')
+
+
 def fix_local_ip(f):
     sudo('sed -i "s!LOCAL_IP!{}!g" {}'.format(env.host, f))
