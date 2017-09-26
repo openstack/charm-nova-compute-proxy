@@ -12,6 +12,7 @@ tags:
   - openstack
 series:
   - xenial
+  - artful
   - trusty
   - zesty
 provides:
