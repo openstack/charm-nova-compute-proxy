@@ -1,0 +1,11 @@
+Code-Review+1: Ryan Beisner <ryan.beisner@canonical.com>
+Verified+1: Canonical CI <uosci-testing-bot@ubuntu.com>
+Code-Review+1: Andrew McLeod <andrew.mcleod@canonical.com>
+Code-Review+2: Corey Bryant <corey.bryant@canonical.com>
+Workflow+1: Corey Bryant <corey.bryant@canonical.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 27 Sep 2017 13:35:44 +0000
+Reviewed-on: https://review.openstack.org/507603
+Project: openstack/charm-nova-compute-proxy
+Branch: refs/heads/master
