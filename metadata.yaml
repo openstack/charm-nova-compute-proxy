@@ -12,9 +12,9 @@ tags:
   - openstack
 series:
   - xenial
+  - bionic
   - artful
   - trusty
-  - zesty
 provides:
   cloud-compute:
     interface: nova-compute
