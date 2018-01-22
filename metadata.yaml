@@ -14,7 +14,6 @@ series:
   - xenial
   - artful
   - trusty
-  - zesty
 provides:
   cloud-compute:
     interface: nova-compute
