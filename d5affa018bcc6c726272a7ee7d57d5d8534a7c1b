@@ -1,0 +1,10 @@
+Verified+1: Canonical CI <uosci-testing-bot@ubuntu.com>
+Code-Review+1: James Page <james.page@canonical.com>
+Code-Review+2: Corey Bryant <corey.bryant@canonical.com>
+Workflow+1: Corey Bryant <corey.bryant@canonical.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Tue, 23 Jan 2018 21:00:28 +0000
+Reviewed-on: https://review.openstack.org/536492
+Project: openstack/charm-nova-compute-proxy
+Branch: refs/heads/stable/17.11
