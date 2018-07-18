@@ -14,12 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Amulet tests on a basic nova compute deployment on xenial-queens."""
+"""Amulet tests on a basic nova compute deployment on cosmic-rocky."""
 
 from basic_deployment import NovaBasicDeployment
 
 if __name__ == '__main__':
-    deployment = NovaBasicDeployment(series='xenial',
-                                     openstack='cloud:xenial-queens',
-                                     source='cloud:xenial-updates/queens')
+    deployment = NovaBasicDeployment(series='cosmic')
     deployment.run_tests()
