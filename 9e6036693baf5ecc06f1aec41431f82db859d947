@@ -1,0 +1,9 @@
+Verified+1: Canonical CI <uosci-testing-bot@ubuntu.com>
+Code-Review+2: Chris MacNaughton (icey) <chris.macnaughton@canonical.com>
+Workflow+1: Chris MacNaughton (icey) <chris.macnaughton@canonical.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Tue, 28 Aug 2018 13:54:25 +0000
+Reviewed-on: https://review.openstack.org/596951
+Project: openstack/charm-nova-compute-proxy
+Branch: refs/heads/master
