@@ -27,6 +27,7 @@ from charmhelpers.core.host import mkdir
 from charmhelpers.contrib.openstack import templating, context
 from charmhelpers.contrib.openstack.utils import (
     _determine_os_workload_status,
+    is_unit_upgrading_set,
 )
 
 from nova_compute_context import (
@@ -191,6 +192,12 @@ def assess_status(configs):
     @param configs: a templating.OSConfigRenderer() object
     @returns None - this function is executed for its side-effect
     """
+    if is_unit_upgrading_set():
+        status_set("blocked",
+                   "Ready for do-release-upgrade and reboot. "
+                   "Set complete when finished.")
+        return
+
     state, message = _determine_os_workload_status(configs,
                                                    REQUIRED_INTERFACES.copy())
     if state != 'active':
