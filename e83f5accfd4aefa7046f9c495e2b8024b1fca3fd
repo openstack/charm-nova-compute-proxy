@@ -1,0 +1,9 @@
+Verified+1: Canonical CI <uosci-testing-bot@ubuntu.com>
+Code-Review+2: Liam Young <liam.young@canonical.com>
+Workflow+1: Liam Young <liam.young@canonical.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Wed, 24 Oct 2018 07:33:26 +0000
+Reviewed-on: https://review.openstack.org/612814
+Project: openstack/charm-nova-compute-proxy
+Branch: refs/heads/master
