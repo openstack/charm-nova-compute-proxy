@@ -1,0 +1,9 @@
+Code-Review+2: David Ames <david.ames@canonical.com>
+Code-Review+2: Corey Bryant <corey.bryant@canonical.com>
+Workflow+1: Corey Bryant <corey.bryant@canonical.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Thu, 01 Nov 2018 21:42:47 +0000
+Reviewed-on: https://review.openstack.org/614854
+Project: openstack/charm-nova-compute-proxy
+Branch: refs/heads/master
