@@ -1,2 +1,0 @@
-bzr [platform:dpkg]  # for bzr+lp: python requirements format
-

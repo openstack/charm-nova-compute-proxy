@@ -1,4 +1,0 @@
-[openstack-remote_{{ yum_repo_id }}]
-name=Remote OpenStack local repository
-baseurl={{ yum_repo }}
-gpgcheck=0
