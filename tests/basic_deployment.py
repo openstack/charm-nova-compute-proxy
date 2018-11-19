@@ -57,7 +57,7 @@ class NovaBasicDeployment(OpenStackAmuletDeployment):
     """Amulet tests on a basic nova compute proxy deployment."""
 
     def __init__(self, series=None, openstack=None, source=None,
-                 git=False, stable=False):
+                 git=False, stable=True):
         """Deploy the entire test environment."""
         super(NovaBasicDeployment, self).__init__(series, openstack,
                                                   source, stable)
