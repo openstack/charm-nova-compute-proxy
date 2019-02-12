@@ -11,7 +11,7 @@ include:
         - apache
         - cluster
     - contrib.network
-    - contrib.python.packages
+    - contrib.python
     - payload
     - contrib.charmsupport
     - contrib.hardening|inc=*
