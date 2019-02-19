@@ -1,0 +1,10 @@
+Verified+1: Canonical CI <uosci-testing-bot@ubuntu.com>
+Code-Review+1: David Ames <david.ames@canonical.com>
+Code-Review+2: Frode Nordahl <frode.nordahl@canonical.com>
+Workflow+1: Frode Nordahl <frode.nordahl@canonical.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Tue, 19 Feb 2019 16:02:52 +0000
+Reviewed-on: https://review.openstack.org/636494
+Project: openstack/charm-nova-compute-proxy
+Branch: refs/heads/master
